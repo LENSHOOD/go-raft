@@ -60,6 +60,13 @@ func (f *Follower) TakeAction(req interface{}) (obj RaftObject, resp interface{}
 }
 
 func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
+	if req.Term < f.currentTerm {
+		return &RequestVoteResp{
+			VoteGranted: false,
+			Term: f.currentTerm,
+		}
+	}
+
 	f.currentTerm = req.Term
 	f.votedFor = req.CandidateId
 
