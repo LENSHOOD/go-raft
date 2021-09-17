@@ -113,7 +113,30 @@ func (f * Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 		return buildResp(false)
 	}
 
+	if !matchPrev(f.log, req.PrevLogTerm, req.PrevLogIndex) {
+		return buildResp(false)
+	}
+
 	return nil
+}
+
+func matchPrev(log []Entry, term Term, idx Index) bool {
+	if len(log) == 0 {
+		return true
+	}
+
+	for i := len(log) - 1; i >= 0; i-- {
+		entry := log[i]
+		if entry.Term < term {
+			return false
+		}
+
+		if entry.Term == term && entry.Idx == idx{
+			return true
+		}
+	}
+
+	return false
 }
 
 type Candidate RaftBase

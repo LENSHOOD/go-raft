@@ -198,3 +198,65 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 	c.Assert(appendResp.Term, Equals, Term(2))
 	c.Assert(appendResp.Success, Equals, false)
 }
+
+func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
+	// given
+	cluster := Cluster {
+		Me:     1,
+		Others: []Id{2, 3},
+	}
+
+	req := &AppendEntriesReq {
+		Term: 4,
+		PrevLogTerm: 2,
+	}
+
+	f := NewFollower(cluster)
+	f.currentTerm = 4
+
+	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
+	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+			Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
+			Entry{Term: 4, Idx: 5, Cmd: ""})
+
+	// when
+	obj, resp := f.TakeAction(req)
+
+	// then
+	appendResp := resp.(*AppendEntriesResp)
+	c.Assert(obj, Equals, f)
+	c.Assert(appendResp.Term, Equals, Term(4))
+	c.Assert(appendResp.Success, Equals, false)
+}
+
+func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) {
+	// given
+	cluster := Cluster {
+		Me:     1,
+		Others: []Id{2, 3},
+	}
+
+	req := &AppendEntriesReq {
+		Term: 4,
+		PrevLogTerm: 3,
+		PrevLogIndex: 5,
+	}
+
+	f := NewFollower(cluster)
+	f.currentTerm = 4
+
+	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
+	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
+		Entry{Term: 4, Idx: 5, Cmd: ""})
+
+	// when
+	obj, resp := f.TakeAction(req)
+
+	// then
+	appendResp := resp.(*AppendEntriesResp)
+	c.Assert(obj, Equals, f)
+	c.Assert(appendResp.Term, Equals, Term(4))
+	c.Assert(appendResp.Success, Equals, false)
+}
+
