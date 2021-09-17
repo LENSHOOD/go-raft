@@ -73,11 +73,11 @@ func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 		}
 	}
 
-	if req.Term == f.currentTerm && f.votedFor != InvalidId && f.votedFor != req.CandidateId {
+	if req.Term < f.currentTerm {
 		return buildResp(false)
 	}
 
-	if req.Term < f.currentTerm {
+	if req.Term == f.currentTerm && f.votedFor != InvalidId && f.votedFor != req.CandidateId {
 		return buildResp(false)
 	}
 
@@ -112,31 +112,45 @@ func (f * Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 	if req.Term < f.currentTerm {
 		return buildResp(false)
 	}
+	f.currentTerm = req.Term
 
-	if !matchPrev(f.log, req.PrevLogTerm, req.PrevLogIndex) {
+	matched, logPos := matchPrev(f.log, req.PrevLogTerm, req.PrevLogIndex)
+	if !matched {
 		return buildResp(false)
 	}
 
-	return nil
+	replicateBeginPos := 0
+	for _, v := range req.Entries {
+		if logPos == -1 || f.log[logPos] != v {
+			break
+		}
+
+		logPos++
+		replicateBeginPos++
+	}
+
+	f.log = append(f.log[:logPos+1], req.Entries[replicateBeginPos:]...)
+
+	return buildResp(true)
 }
 
-func matchPrev(log []Entry, term Term, idx Index) bool {
+func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 	if len(log) == 0 {
-		return true
+		return true, -1
 	}
 
 	for i := len(log) - 1; i >= 0; i-- {
 		entry := log[i]
 		if entry.Term < term {
-			return false
+			return false, -1
 		}
 
 		if entry.Term == term && entry.Idx == idx{
-			return true
+			return true, i
 		}
 	}
 
-	return false
+	return false, -1
 }
 
 type Candidate RaftBase

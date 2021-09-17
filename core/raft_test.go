@@ -260,3 +260,115 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 	c.Assert(appendResp.Success, Equals, false)
 }
 
+func (t *T) TestFollowerAppendLogToLast(c *C) {
+	// given
+	cluster := Cluster {
+		Me:     1,
+		Others: []Id{2, 3},
+	}
+
+	req := &AppendEntriesReq {
+		Term: 4,
+		PrevLogTerm: 4,
+		PrevLogIndex: 5,
+		Entries: []Entry{{Term: 4, Idx: 6, Cmd: ""}},
+	}
+
+	f := NewFollower(cluster)
+	f.currentTerm = 4
+
+	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
+	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
+		Entry{Term: 4, Idx: 5, Cmd: ""})
+
+	// when
+	obj, resp := f.TakeAction(req)
+
+	// then
+	appendResp := resp.(*AppendEntriesResp)
+	c.Assert(obj, Equals, f)
+	c.Assert(appendResp.Term, Equals, Term(4))
+	c.Assert(appendResp.Success, Equals, true)
+	c.Assert(f.log[len(f.log)-1], Equals, Entry{Term: 4, Idx: 6, Cmd: ""})
+}
+
+func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntries(c *C) {
+	// given
+	cluster := Cluster {
+		Me:     1,
+		Others: []Id{2, 3},
+	}
+
+	req := &AppendEntriesReq {
+		Term: 4,
+		PrevLogTerm: 1,
+		PrevLogIndex: 1,
+		Entries: []Entry{{Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}},
+	}
+
+	f := NewFollower(cluster)
+	f.currentTerm = 4
+
+	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
+	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
+		Entry{Term: 4, Idx: 5, Cmd: ""})
+
+	// when
+	obj, resp := f.TakeAction(req)
+
+	// then
+	appendResp := resp.(*AppendEntriesResp)
+	c.Assert(obj, Equals, f)
+	c.Assert(appendResp.Term, Equals, Term(4))
+	c.Assert(appendResp.Success, Equals, true)
+
+	expected := []Entry{{Term: 1, Idx: 0, Cmd: ""}, {Term: 1, Idx: 1, Cmd: ""}, {Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}}
+	if len(f.log) != len(expected) {
+		c.Fail()
+	}
+	for i := 0; i < len(expected); i++ {
+		c.Assert(expected[i], Equals, f.log[i])
+	}
+}
+
+func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSame(c *C) {
+	// given
+	cluster := Cluster {
+		Me:     1,
+		Others: []Id{2, 3},
+	}
+
+	req := &AppendEntriesReq {
+		Term: 4,
+		PrevLogTerm: 1,
+		PrevLogIndex: 0,
+		Entries: []Entry{{Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}},
+	}
+
+	f := NewFollower(cluster)
+	f.currentTerm = 4
+
+	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
+	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
+		Entry{Term: 3, Idx: 5, Cmd: ""})
+
+	// when
+	obj, resp := f.TakeAction(req)
+
+	// then
+	appendResp := resp.(*AppendEntriesResp)
+	c.Assert(obj, Equals, f)
+	c.Assert(appendResp.Term, Equals, Term(4))
+	c.Assert(appendResp.Success, Equals, true)
+
+	expected := []Entry{{Term: 1, Idx: 0, Cmd: ""}, {Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}}
+	if len(f.log) != len(expected) {
+		c.Fail()
+	}
+	for i := 0; i < len(expected); i++ {
+		c.Assert(expected[i], Equals, f.log[i])
+	}
+}
