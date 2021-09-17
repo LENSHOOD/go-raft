@@ -293,7 +293,7 @@ func (t *T) TestFollowerAppendLogToLast(c *C) {
 	c.Assert(f.log[len(f.log)-1], Equals, Entry{Term: 4, Idx: 6, Cmd: ""})
 }
 
-func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntries(c *C) {
+func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCommitIndexToLeaderCommit(c *C) {
 	// given
 	cluster := Cluster {
 		Me:     1,
@@ -304,6 +304,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntries(c *C) {
 		Term: 4,
 		PrevLogTerm: 1,
 		PrevLogIndex: 1,
+		LeaderCommit: 3,
 		Entries: []Entry{{Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}},
 	}
 
@@ -331,9 +332,12 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntries(c *C) {
 	for i := 0; i < len(expected); i++ {
 		c.Assert(expected[i], Equals, f.log[i])
 	}
+
+	c.Assert(f.commitIndex, Equals, Index(3))
+	c.Assert(f.lastApplied, Equals, Index(3))
 }
 
-func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSame(c *C) {
+func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenUpdateCommitIndexToLastNewEntry(c *C) {
 	// given
 	cluster := Cluster {
 		Me:     1,
@@ -344,6 +348,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSame(c *C
 		Term: 4,
 		PrevLogTerm: 1,
 		PrevLogIndex: 0,
+		LeaderCommit: 8,
 		Entries: []Entry{{Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}},
 	}
 
@@ -371,4 +376,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSame(c *C
 	for i := 0; i < len(expected); i++ {
 		c.Assert(expected[i], Equals, f.log[i])
 	}
+
+	c.Assert(f.commitIndex, Equals, Index(5))
+	c.Assert(f.lastApplied, Equals, Index(5))
 }

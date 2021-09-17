@@ -130,6 +130,15 @@ func (f * Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 	}
 
 	f.log = append(f.log[:logPos+1], req.Entries[replicateBeginPos:]...)
+	lastEntryIndex := f.log[len(f.log) - 1].Idx
+	if lastEntryIndex < req.LeaderCommit {
+		f.commitIndex = lastEntryIndex
+	} else {
+		f.commitIndex = req.LeaderCommit
+	}
+
+	// TODO: Apply cmd to state machine, consider add a apply channel. Apply from lastApplied to commitIndex
+	f.lastApplied = f.commitIndex
 
 	return buildResp(true)
 }
