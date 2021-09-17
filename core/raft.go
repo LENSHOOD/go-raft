@@ -1,5 +1,7 @@
 package core
 
+import "math/rand"
+
 type Id int64
 const InvalidId Id = -1
 
@@ -14,7 +16,7 @@ type Entry struct {
 }
 
 type RaftObject interface {
-	TakeAction(req interface{}) (obj RaftObject, resp interface{})
+	TakeAction(tor TickOrReq) (obj RaftObject, resp interface{})
 }
 
 type Cluster struct {
@@ -22,8 +24,17 @@ type Cluster struct {
 	Others []Id
 }
 
-type RaftBase struct {
+type Config struct {
 	cluster Cluster
+	leader Id
+	electionTimeoutMin int64
+	electionTimeoutMax int64
+	electionTimeout int64
+	tickCnt int64
+}
+
+type RaftBase struct {
+	cfg Config
 	currentTerm Term
 	votedFor Id
 	commitIndex Index
@@ -31,9 +42,9 @@ type RaftBase struct {
 	log []Entry
 }
 
-func newRaftBase(cluster Cluster) RaftBase {
+func newRaftBase(cfg Config) RaftBase {
 	return RaftBase {
-		cluster: cluster,
+		cfg: cfg,
 		currentTerm: 0,
 		votedFor: InvalidId,
 		commitIndex: 0,
@@ -44,17 +55,28 @@ func newRaftBase(cluster Cluster) RaftBase {
 
 type Follower RaftBase
 
-func NewFollower(cluster Cluster) *Follower {
-	follower := Follower(newRaftBase(cluster))
+func NewFollower(cfg Config) *Follower {
+	follower := Follower(newRaftBase(cfg))
 	return &follower
 }
 
-func (f *Follower) TakeAction(req interface{}) (obj RaftObject, resp interface{}) {
-	switch req.(type) {
+func (f *Follower) TakeAction(tor TickOrReq) (obj RaftObject, resp interface{}) {
+	if tor.Req == nil {
+		f.cfg.tickCnt++
+
+		if f.cfg.tickCnt == f.cfg.electionTimeout {
+			f.cfg.tickCnt = 0
+			f.cfg.electionTimeout = rand.Int63n(f.cfg.electionTimeoutMax - f.cfg.electionTimeoutMin) + f.cfg.electionTimeoutMin
+			return f.toCandidate(), nil
+		}
+	}
+
+	f.cfg.tickCnt = 0
+	switch tor.Req.(type) {
 	case *RequestVoteReq:
-		return f, f.vote(req.(*RequestVoteReq))
+		return f, f.vote(tor.Req.(*RequestVoteReq))
 	case *AppendEntriesReq:
-		return f, f.append(req.(*AppendEntriesReq))
+		return f, f.append(tor.Req.(*AppendEntriesReq))
 	default:
 		panic("Shouldn't goes here")
 	}
@@ -162,7 +184,22 @@ func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 	return false, -1
 }
 
+func (f *Follower) toCandidate() *Candidate {
+	return &Candidate {
+		cfg: f.cfg,
+		currentTerm: f.currentTerm,
+		votedFor: 0,
+		commitIndex: f.commitIndex,
+		lastApplied: f.lastApplied,
+		log: f.log,
+	}
+}
+
 type Candidate RaftBase
+
+func (c *Candidate) TakeAction(tor TickOrReq) (obj RaftObject, resp interface{}) {
+	return nil, nil
+}
 
 type Leader struct {
 	base RaftBase

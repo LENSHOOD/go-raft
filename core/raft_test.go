@@ -14,17 +14,21 @@ var _ = Suite(&T{})
 
 func (t *T) TestFollowerVoteWithInit(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &RequestVoteReq {
-		Term:        1,
-		CandidateId: 2,
+	req := TickOrReq {
+		Req: &RequestVoteReq {
+				Term:        1,
+				CandidateId: 2,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 
 	// when
 	obj, resp := f.TakeAction(req)
@@ -39,17 +43,21 @@ func (t *T) TestFollowerVoteWithInit(c *C) {
 
 func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &RequestVoteReq {
-		Term:        1,
-		CandidateId: 2,
+	req := TickOrReq {
+		Req: &RequestVoteReq {
+			Term:        1,
+			CandidateId: 2,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 2
 
 	// when
@@ -64,17 +72,21 @@ func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
 
 func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &RequestVoteReq {
-		Term:        1,
-		CandidateId: 2,
+	req := TickOrReq {
+		Req: &RequestVoteReq {
+			Term:        1,
+			CandidateId: 2,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 1
 	f.votedFor = 3
 
@@ -90,17 +102,21 @@ func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 
 func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &RequestVoteReq {
-		Term:        2,
-		CandidateId: 3,
+	req := TickOrReq {
+		Req: &RequestVoteReq {
+			Term:        2,
+			CandidateId: 3,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 1
 	f.votedFor = 2
 
@@ -117,19 +133,23 @@ func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 
 func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &RequestVoteReq {
-		Term:        5,
-		CandidateId: 2,
-		LastLogIndex: 1,
-		LastLogTerm: 2,
+	req := TickOrReq {
+		Req: &RequestVoteReq {
+			Term:        5,
+			CandidateId: 2,
+			LastLogIndex: 1,
+			LastLogTerm: 2,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 4
 	f.log = append(f.log, Entry{
 		Term: 3,
@@ -149,19 +169,23 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 
 func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &RequestVoteReq {
-		Term:        5,
-		CandidateId: 2,
-		LastLogIndex: 1,
-		LastLogTerm: 2,
+	req := TickOrReq {
+		Req: &RequestVoteReq {
+			Term:        5,
+			CandidateId: 2,
+			LastLogIndex: 1,
+			LastLogTerm: 2,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 4
 	f.log = append(f.log, Entry{Term: 2, Idx: 0, Cmd: "0"}, Entry{Term: 2, Idx: 1, Cmd: "1"}, Entry{Term: 2, Idx: 2, Cmd: "2"})
 
@@ -177,16 +201,20 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C
 
 func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &AppendEntriesReq {
-		Term: 1,
+	req := TickOrReq {
+		Req: &AppendEntriesReq {
+			Term: 1,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 2
 
 	// when
@@ -201,17 +229,21 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 
 func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &AppendEntriesReq {
-		Term: 4,
-		PrevLogTerm: 2,
+	req := TickOrReq {
+		Req: &AppendEntriesReq{
+			Term:        4,
+			PrevLogTerm: 2,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
@@ -231,18 +263,22 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 
 func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &AppendEntriesReq {
-		Term: 4,
-		PrevLogTerm: 3,
-		PrevLogIndex: 5,
+	req := TickOrReq {
+		Req: &AppendEntriesReq{
+			Term:         4,
+			PrevLogTerm:  3,
+			PrevLogIndex: 5,
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
@@ -262,19 +298,23 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 
 func (t *T) TestFollowerAppendLogToLast(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &AppendEntriesReq {
-		Term: 4,
-		PrevLogTerm: 4,
-		PrevLogIndex: 5,
-		Entries: []Entry{{Term: 4, Idx: 6, Cmd: ""}},
+	req := TickOrReq {
+		Req: &AppendEntriesReq{
+			Term:         4,
+			PrevLogTerm:  4,
+			PrevLogIndex: 5,
+			Entries:      []Entry{{Term: 4, Idx: 6, Cmd: ""}},
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
@@ -295,20 +335,24 @@ func (t *T) TestFollowerAppendLogToLast(c *C) {
 
 func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCommitIndexToLeaderCommit(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &AppendEntriesReq {
-		Term: 4,
-		PrevLogTerm: 1,
-		PrevLogIndex: 1,
-		LeaderCommit: 3,
-		Entries: []Entry{{Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}},
+	req := TickOrReq {
+		Req: &AppendEntriesReq{
+			Term:         4,
+			PrevLogTerm:  1,
+			PrevLogIndex: 1,
+			LeaderCommit: 3,
+			Entries:      []Entry{{Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}},
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
@@ -339,20 +383,24 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 
 func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenUpdateCommitIndexToLastNewEntry(c *C) {
 	// given
-	cluster := Cluster {
-		Me:     1,
-		Others: []Id{2, 3},
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
 	}
 
-	req := &AppendEntriesReq {
-		Term: 4,
-		PrevLogTerm: 1,
-		PrevLogIndex: 0,
-		LeaderCommit: 8,
-		Entries: []Entry{{Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}},
+	req := TickOrReq {
+		Req: &AppendEntriesReq{
+			Term:         4,
+			PrevLogTerm:  1,
+			PrevLogIndex: 0,
+			LeaderCommit: 8,
+			Entries:      []Entry{{Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}},
+		},
 	}
 
-	f := NewFollower(cluster)
+	f := NewFollower(cfg)
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5

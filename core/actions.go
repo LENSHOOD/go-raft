@@ -1,5 +1,9 @@
 package core
 
+type TickOrReq struct {
+	Req interface{}
+}
+
 type RequestVoteReq struct {
 	Term Term
 	CandidateId Id
