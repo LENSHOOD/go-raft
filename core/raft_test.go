@@ -174,3 +174,27 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C
 	c.Assert(voteResp.Term, Equals, Term(4))
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
+
+func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
+	// given
+	cluster := Cluster {
+		Me:     1,
+		Others: []Id{2, 3},
+	}
+
+	req := &AppendEntriesReq {
+		Term: 1,
+	}
+
+	f := NewFollower(cluster)
+	f.currentTerm = 2
+
+	// when
+	obj, resp := f.TakeAction(req)
+
+	// then
+	appendResp := resp.(*AppendEntriesResp)
+	c.Assert(obj, Equals, f)
+	c.Assert(appendResp.Term, Equals, Term(2))
+	c.Assert(appendResp.Success, Equals, false)
+}

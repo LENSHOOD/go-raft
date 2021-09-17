@@ -54,7 +54,7 @@ func (f *Follower) TakeAction(req interface{}) (obj RaftObject, resp interface{}
 	case *RequestVoteReq:
 		return f, f.vote(req.(*RequestVoteReq))
 	case *AppendEntriesReq:
-		return nil, nil
+		return f, f.append(req.(*AppendEntriesReq))
 	default:
 		panic("Shouldn't goes here")
 	}
@@ -92,6 +92,28 @@ func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 	f.votedFor = req.CandidateId
 
 	return buildResp(true)
+}
+
+// append log from leader, rules:
+//     1. if term < currentTerm, not append
+//     2. if follower's log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm, not append
+//     3. if an existing entry conflicts with a new one (same index but different terms),
+//        delete the existing entry and all that follow it
+//     4. append any new entries not already in the log
+//     5. if leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+func (f * Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
+	buildResp := func(success bool) *AppendEntriesResp {
+		return &AppendEntriesResp {
+			Term: f.currentTerm,
+			Success: success,
+		}
+	}
+
+	if req.Term < f.currentTerm {
+		return buildResp(false)
+	}
+
+	return nil
 }
 
 type Candidate RaftBase
