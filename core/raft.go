@@ -8,8 +8,9 @@ type Index int64
 type Command string
 
 type Entry struct {
-	term Term
-	cmd Command
+	Term Term
+	Idx Index
+	Cmd Command
 }
 
 type RaftObject interface {
@@ -77,6 +78,13 @@ func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 
 	if req.Term < f.currentTerm {
 		return buildResp(false)
+	}
+
+	if lastIdx := len(f.log) - 1; lastIdx >= 0 {
+		lastEntry := f.log[lastIdx]
+		if lastEntry.Term > req.LastLogTerm || (lastEntry.Term == req.LastLogTerm && lastEntry.Idx > req.LastLogIndex) {
+			return buildResp(false)
+		}
 	}
 
 	f.currentTerm = req.Term

@@ -86,3 +86,63 @@ func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 	c.Assert(voteResp.Term, Equals, Term(1))
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
+
+func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
+	// given
+	cluster := Cluster {
+		Me:     1,
+		Others: []Id{2, 3},
+	}
+
+	req := &RequestVoteReq {
+		Term:        5,
+		CandidateId: 2,
+		LastLogIndex: 1,
+		LastLogTerm: 2,
+	}
+
+	f := NewFollower(cluster)
+	f.currentTerm = 4
+	f.log = append(f.log, Entry{
+		Term: 3,
+		Idx: 5,
+		Cmd: "",
+	})
+
+	// when
+	obj, resp := f.TakeAction(req)
+
+	// then
+	voteResp := resp.(*RequestVoteResp)
+	c.Assert(obj, Equals, f)
+	c.Assert(voteResp.Term, Equals, Term(4))
+	c.Assert(voteResp.VoteGranted, Equals, false)
+}
+
+func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C) {
+	// given
+	cluster := Cluster {
+		Me:     1,
+		Others: []Id{2, 3},
+	}
+
+	req := &RequestVoteReq {
+		Term:        5,
+		CandidateId: 2,
+		LastLogIndex: 1,
+		LastLogTerm: 2,
+	}
+
+	f := NewFollower(cluster)
+	f.currentTerm = 4
+	f.log = append(f.log, Entry{Term: 2, Idx: 0, Cmd: "0"}, Entry{Term: 2, Idx: 1, Cmd: "1"}, Entry{Term: 2, Idx: 2, Cmd: "2"})
+
+	// when
+	obj, resp := f.TakeAction(req)
+
+	// then
+	voteResp := resp.(*RequestVoteResp)
+	c.Assert(obj, Equals, f)
+	c.Assert(voteResp.Term, Equals, Term(4))
+	c.Assert(voteResp.VoteGranted, Equals, false)
+}
