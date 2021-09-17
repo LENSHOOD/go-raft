@@ -62,7 +62,8 @@ func (f *Follower) TakeAction(req interface{}) (obj RaftObject, resp interface{}
 
 // vote for some candidate, rules:
 //     1. if term < currentTerm, not vote
-//     2. first-come-first-served, if already vote to candidate-a, then not vote to candidate-b
+//     2. first-come-first-served, if already vote to candidate-a,
+//        then not vote to candidate-b, clear voteFor when term > currentTerm
 //     3. if follower's last log entry's term or index bigger than candidate, not vote
 func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 	buildResp := func(grant bool) *RequestVoteResp {
@@ -72,7 +73,7 @@ func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 		}
 	}
 
-	if f.votedFor != InvalidId && f.votedFor != req.CandidateId {
+	if req.Term == f.currentTerm && f.votedFor != InvalidId && f.votedFor != req.CandidateId {
 		return buildResp(false)
 	}
 

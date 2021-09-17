@@ -15,6 +15,7 @@ type RequestVoteResp struct {
 type AppendEntriesReq struct {
 	Term Term
 	LeaderId Id
+	PrevLogIndex Index
 	PrevLogTerm Term
 	Entries []Entry
 	LeaderCommit Index
