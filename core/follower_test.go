@@ -459,7 +459,7 @@ func (t *T) TestFollowerTriggerElectionTimeoutWithEmptyTick(c *C) {
 	} else {
 		c.Assert(candidate.log, DeepEquals, f.log)
 		c.Assert(candidate.votedFor, Equals, Id(0))
-		c.Assert(candidate.currentTerm, Equals, Term(f.currentTerm + 1))
+		c.Assert(candidate.currentTerm, Equals, f.currentTerm + 1)
 		c.Assert(candidate.cfg.tickCnt, Equals, int64(0))
 		legalElectionTimeout := candidate.cfg.electionTimeout >= candidate.cfg.electionTimeoutMin && candidate.cfg.electionTimeout <= candidate.cfg.electionTimeoutMax
 		c.Assert(legalElectionTimeout, Equals, true)

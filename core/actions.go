@@ -11,8 +11,12 @@ const (
 
 type Msg struct {
 	tp MsgType
+	from Id
+	to Id
 	payload interface{}
 }
+
+var NullMsg = Msg{tp: Null}
 
 type TickOrReq struct {
 	Req interface{}
