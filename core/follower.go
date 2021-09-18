@@ -1,7 +1,5 @@
 package core
 
-import "math/rand"
-
 type Follower struct{ RaftBase }
 
 func NewFollower(cfg Config) *Follower {
@@ -15,8 +13,6 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 		f.cfg.tickCnt++
 
 		if f.cfg.tickCnt == f.cfg.electionTimeout {
-			f.cfg.tickCnt = 0
-			f.cfg.electionTimeout = rand.Int63n(f.cfg.electionTimeoutMax-f.cfg.electionTimeoutMin) + f.cfg.electionTimeoutMin
 			return f.moveState(f.toCandidate())
 		}
 
@@ -139,14 +135,5 @@ func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 }
 
 func (f *Follower) toCandidate() *Candidate {
-	return &Candidate{
-		RaftBase{
-			cfg:         f.cfg,
-			currentTerm: f.currentTerm + 1,
-			votedFor:    0,
-			commitIndex: f.commitIndex,
-			lastApplied: f.lastApplied,
-			log:         f.log,
-		},
-	}
+	return NewCandidate(f)
 }
