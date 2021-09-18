@@ -1,5 +1,19 @@
 package core
 
+type MsgType int
+const (
+	Tick MsgType = iota
+	MoveState
+	Req
+	Resp
+	Null
+)
+
+type Msg struct {
+	tp MsgType
+	payload interface{}
+}
+
 type TickOrReq struct {
 	Req interface{}
 }

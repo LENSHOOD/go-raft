@@ -3,6 +3,7 @@ package core
 import "math/rand"
 
 type Id int64
+
 const InvalidId Id = -1
 
 type Term int64
@@ -11,45 +12,45 @@ type Command string
 
 type Entry struct {
 	Term Term
-	Idx Index
-	Cmd Command
+	Idx  Index
+	Cmd  Command
 }
 
 type RaftObject interface {
-	TakeAction(tor TickOrReq) (obj RaftObject, resp interface{})
+	TakeAction(msg Msg) Msg
 }
 
 type Cluster struct {
-	Me Id
+	Me     Id
 	Others []Id
 }
 
 type Config struct {
-	cluster Cluster
-	leader Id
+	cluster            Cluster
+	leader             Id
 	electionTimeoutMin int64
 	electionTimeoutMax int64
-	electionTimeout int64
-	tickCnt int64
+	electionTimeout    int64
+	tickCnt            int64
 }
 
 type RaftBase struct {
-	cfg Config
+	cfg         Config
 	currentTerm Term
-	votedFor Id
+	votedFor    Id
 	commitIndex Index
 	lastApplied Index
-	log []Entry
+	log         []Entry
 }
 
 func newRaftBase(cfg Config) RaftBase {
-	return RaftBase {
-		cfg: cfg,
+	return RaftBase{
+		cfg:         cfg,
 		currentTerm: 0,
-		votedFor: InvalidId,
+		votedFor:    InvalidId,
 		commitIndex: 0,
 		lastApplied: 0,
-		log: make([]Entry, 0),
+		log:         make([]Entry, 0),
 	}
 }
 
@@ -60,27 +61,41 @@ func NewFollower(cfg Config) *Follower {
 	return &follower
 }
 
-func (f *Follower) TakeAction(tor TickOrReq) (obj RaftObject, resp interface{}) {
-	if tor.Req == nil {
+func (f *Follower) TakeAction(msg Msg) Msg {
+	switch msg.tp {
+	case Tick:
 		f.cfg.tickCnt++
 
 		if f.cfg.tickCnt == f.cfg.electionTimeout {
 			f.cfg.tickCnt = 0
-			f.cfg.electionTimeout = rand.Int63n(f.cfg.electionTimeoutMax - f.cfg.electionTimeoutMin) + f.cfg.electionTimeoutMin
-			return f.toCandidate(), nil
+			f.cfg.electionTimeout = rand.Int63n(f.cfg.electionTimeoutMax-f.cfg.electionTimeoutMin) + f.cfg.electionTimeoutMin
+			return Msg{
+				tp:      MoveState,
+				payload: f.toCandidate(),
+			}
 		}
 
-		return f, nil
-	}
+		return Msg{tp: Null}
 
-	f.cfg.tickCnt = 0
-	switch tor.Req.(type) {
-	case *RequestVoteReq:
-		return f, f.vote(tor.Req.(*RequestVoteReq))
-	case *AppendEntriesReq:
-		return f, f.append(tor.Req.(*AppendEntriesReq))
+	case Req:
+		f.cfg.tickCnt = 0
+		switch msg.payload.(type) {
+		case *RequestVoteReq:
+			return Msg{
+				tp:      Resp,
+				payload: f.vote(msg.payload.(*RequestVoteReq)),
+			}
+		case *AppendEntriesReq:
+			return Msg{
+				tp:      Resp,
+				payload: f.append(msg.payload.(*AppendEntriesReq)),
+			}
+		}
+
+		fallthrough
 	default:
-		panic("Shouldn't goes here")
+		// return null for meaningless msg
+		return Msg{tp: Null}
 	}
 }
 
@@ -91,9 +106,9 @@ func (f *Follower) TakeAction(tor TickOrReq) (obj RaftObject, resp interface{}) 
 //     3. if follower's last log entry's term or index bigger than candidate, not vote
 func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 	buildResp := func(grant bool) *RequestVoteResp {
-		return &RequestVoteResp {
+		return &RequestVoteResp{
 			VoteGranted: grant,
-			Term: f.currentTerm,
+			Term:        f.currentTerm,
 		}
 	}
 
@@ -125,10 +140,10 @@ func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 //        delete the existing entry and all that follow it
 //     4. append any new entries not already in the log
 //     5. if leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
-func (f * Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
+func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 	buildResp := func(success bool) *AppendEntriesResp {
-		return &AppendEntriesResp {
-			Term: f.currentTerm,
+		return &AppendEntriesResp{
+			Term:    f.currentTerm,
 			Success: success,
 		}
 	}
@@ -154,7 +169,7 @@ func (f * Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 	}
 
 	f.log = append(f.log[:logPos+1], req.Entries[replicateBeginPos:]...)
-	lastEntryIndex := f.log[len(f.log) - 1].Idx
+	lastEntryIndex := f.log[len(f.log)-1].Idx
 	if lastEntryIndex < req.LeaderCommit {
 		f.commitIndex = lastEntryIndex
 	} else {
@@ -178,7 +193,7 @@ func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 			return false, -1
 		}
 
-		if entry.Term == term && entry.Idx == idx{
+		if entry.Term == term && entry.Idx == idx {
 			return true, i
 		}
 	}
@@ -187,25 +202,24 @@ func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 }
 
 func (f *Follower) toCandidate() *Candidate {
-	return &Candidate {
-		cfg: f.cfg,
+	return &Candidate{
+		cfg:         f.cfg,
 		currentTerm: f.currentTerm + 1,
-		votedFor: 0,
+		votedFor:    0,
 		commitIndex: f.commitIndex,
 		lastApplied: f.lastApplied,
-		log: f.log,
+		log:         f.log,
 	}
 }
 
 type Candidate RaftBase
 
-func (c *Candidate) TakeAction(tor TickOrReq) (obj RaftObject, resp interface{}) {
-	return nil, nil
+func (c *Candidate) TakeAction(msg Msg) Msg {
+	return Msg{}
 }
 
 type Leader struct {
-	base RaftBase
-	nextIndex []Index
+	base       RaftBase
+	nextIndex  []Index
 	matchIndex []Index
 }
-

@@ -21,8 +21,9 @@ func (t *T) TestFollowerVoteWithInit(c *C) {
 		},
 	}
 
-	req := TickOrReq {
-		Req: &RequestVoteReq {
+	req := Msg {
+		tp: Req,
+		payload: &RequestVoteReq {
 				Term:        1,
 				CandidateId: 2,
 		},
@@ -31,11 +32,11 @@ func (t *T) TestFollowerVoteWithInit(c *C) {
 	f := NewFollower(cfg)
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	voteResp := resp.(*RequestVoteResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(1))
 	c.Assert(voteResp.VoteGranted, Equals, true)
 	c.Assert(f.votedFor, Equals, Id(2))
@@ -50,8 +51,9 @@ func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
 		},
 	}
 
-	req := TickOrReq {
-		Req: &RequestVoteReq {
+	req := Msg {
+		tp: Req,
+		payload: &RequestVoteReq {
 			Term:        1,
 			CandidateId: 2,
 		},
@@ -61,11 +63,11 @@ func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
 	f.currentTerm = 2
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	voteResp := resp.(*RequestVoteResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(2))
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
@@ -79,8 +81,9 @@ func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 		},
 	}
 
-	req := TickOrReq {
-		Req: &RequestVoteReq {
+	req := Msg {
+		tp: Req,
+		payload: &RequestVoteReq {
 			Term:        1,
 			CandidateId: 2,
 		},
@@ -91,11 +94,11 @@ func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 	f.votedFor = 3
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	voteResp := resp.(*RequestVoteResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(1))
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
@@ -109,8 +112,9 @@ func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 		},
 	}
 
-	req := TickOrReq {
-		Req: &RequestVoteReq {
+	req := Msg {
+		tp: Req,
+		payload: &RequestVoteReq {
 			Term:        2,
 			CandidateId: 3,
 		},
@@ -121,11 +125,11 @@ func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 	f.votedFor = 2
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	voteResp := resp.(*RequestVoteResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(f.votedFor, Equals, Id(3))
 	c.Assert(voteResp.Term, Equals, Term(2))
 	c.Assert(voteResp.VoteGranted, Equals, true)
@@ -140,8 +144,9 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 		},
 	}
 
-	req := TickOrReq {
-		Req: &RequestVoteReq {
+	req := Msg {
+		tp: Req,
+		payload: &RequestVoteReq {
 			Term:        5,
 			CandidateId: 2,
 			LastLogIndex: 1,
@@ -158,11 +163,11 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 	})
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	voteResp := resp.(*RequestVoteResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(4))
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
@@ -176,8 +181,9 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C
 		},
 	}
 
-	req := TickOrReq {
-		Req: &RequestVoteReq {
+	req := Msg {
+		tp: Req,
+		payload: &RequestVoteReq {
 			Term:        5,
 			CandidateId: 2,
 			LastLogIndex: 1,
@@ -190,11 +196,11 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C
 	f.log = append(f.log, Entry{Term: 2, Idx: 0, Cmd: "0"}, Entry{Term: 2, Idx: 1, Cmd: "1"}, Entry{Term: 2, Idx: 2, Cmd: "2"})
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	voteResp := resp.(*RequestVoteResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(4))
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
@@ -208,8 +214,9 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 		},
 	}
 
-	req := TickOrReq {
-		Req: &AppendEntriesReq {
+	req := Msg {
+		tp: Req,
+		payload: &AppendEntriesReq {
 			Term: 1,
 		},
 	}
@@ -218,11 +225,11 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 	f.currentTerm = 2
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	appendResp := resp.(*AppendEntriesResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(2))
 	c.Assert(appendResp.Success, Equals, false)
 }
@@ -236,8 +243,9 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 		},
 	}
 
-	req := TickOrReq {
-		Req: &AppendEntriesReq{
+	req := Msg {
+		tp: Req,
+		payload: &AppendEntriesReq{
 			Term:        4,
 			PrevLogTerm: 2,
 		},
@@ -252,11 +260,11 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 			Entry{Term: 4, Idx: 5, Cmd: ""})
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	appendResp := resp.(*AppendEntriesResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, false)
 }
@@ -270,8 +278,9 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 		},
 	}
 
-	req := TickOrReq {
-		Req: &AppendEntriesReq{
+	req := Msg {
+		tp: Req,
+		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  3,
 			PrevLogIndex: 5,
@@ -287,11 +296,11 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 		Entry{Term: 4, Idx: 5, Cmd: ""})
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	appendResp := resp.(*AppendEntriesResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, false)
 }
@@ -305,8 +314,9 @@ func (t *T) TestFollowerAppendLogToLast(c *C) {
 		},
 	}
 
-	req := TickOrReq {
-		Req: &AppendEntriesReq{
+	req := Msg {
+		tp: Req,
+		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  4,
 			PrevLogIndex: 5,
@@ -323,11 +333,11 @@ func (t *T) TestFollowerAppendLogToLast(c *C) {
 		Entry{Term: 4, Idx: 5, Cmd: ""})
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	appendResp := resp.(*AppendEntriesResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
 	c.Assert(f.log[len(f.log)-1], Equals, Entry{Term: 4, Idx: 6, Cmd: ""})
@@ -342,8 +352,9 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 		},
 	}
 
-	req := TickOrReq {
-		Req: &AppendEntriesReq{
+	req := Msg {
+		tp: Req,
+		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  1,
 			PrevLogIndex: 1,
@@ -361,11 +372,11 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 		Entry{Term: 4, Idx: 5, Cmd: ""})
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	appendResp := resp.(*AppendEntriesResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
 
@@ -384,8 +395,9 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenU
 		},
 	}
 
-	req := TickOrReq {
-		Req: &AppendEntriesReq{
+	req := Msg {
+		tp: Req,
+		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  1,
 			PrevLogIndex: 0,
@@ -403,11 +415,11 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenU
 		Entry{Term: 3, Idx: 5, Cmd: ""})
 
 	// when
-	obj, resp := f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	appendResp := resp.(*AppendEntriesResp)
-	c.Assert(obj, Equals, f)
+	c.Assert(res.tp, Equals, Resp)
+	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
 
@@ -430,18 +442,19 @@ func (t *T) TestFollowerTriggerElectionTimeoutWithEmptyTick(c *C) {
 		tickCnt: 0,
 	}
 
-	req := TickOrReq { Req: nil }
+	req := Msg { tp: Tick }
 
 	f := NewFollower(cfg)
 
 	// when
-	f.TakeAction(req)
-	f.TakeAction(req)
-	obj, _ := f.TakeAction(req)
+	_ = f.TakeAction(req)
+	_ = f.TakeAction(req)
+	res := f.TakeAction(req)
 
 	// then
-	c.Assert(obj, Not(Equals), f)
-	if candidate, ok := obj.(*Candidate); !ok {
+	c.Assert(res.tp, Equals, MoveState)
+	c.Assert(res.payload, Not(Equals), f)
+	if candidate, ok := res.payload.(*Candidate); !ok {
 		c.Fail()
 	} else {
 		c.Assert(candidate.log, DeepEquals, f.log)
