@@ -69,6 +69,8 @@ func (f *Follower) TakeAction(tor TickOrReq) (obj RaftObject, resp interface{}) 
 			f.cfg.electionTimeout = rand.Int63n(f.cfg.electionTimeoutMax - f.cfg.electionTimeoutMin) + f.cfg.electionTimeoutMin
 			return f.toCandidate(), nil
 		}
+
+		return f, nil
 	}
 
 	f.cfg.tickCnt = 0
@@ -187,7 +189,7 @@ func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 func (f *Follower) toCandidate() *Candidate {
 	return &Candidate {
 		cfg: f.cfg,
-		currentTerm: f.currentTerm,
+		currentTerm: f.currentTerm + 1,
 		votedFor: 0,
 		commitIndex: f.commitIndex,
 		lastApplied: f.lastApplied,

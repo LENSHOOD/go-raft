@@ -369,14 +369,8 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
 
-	expected := []Entry{{Term: 1, Idx: 0, Cmd: ""}, {Term: 1, Idx: 1, Cmd: ""}, {Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}}
-	if len(f.log) != len(expected) {
-		c.Fail()
-	}
-	for i := 0; i < len(expected); i++ {
-		c.Assert(expected[i], Equals, f.log[i])
-	}
-
+	expectedLog := []Entry{{Term: 1, Idx: 0, Cmd: ""}, {Term: 1, Idx: 1, Cmd: ""}, {Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}}
+	c.Assert(expectedLog, DeepEquals, f.log)
 	c.Assert(f.commitIndex, Equals, Index(3))
 	c.Assert(f.lastApplied, Equals, Index(3))
 }
@@ -417,14 +411,44 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenU
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
 
-	expected := []Entry{{Term: 1, Idx: 0, Cmd: ""}, {Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}}
-	if len(f.log) != len(expected) {
-		c.Fail()
-	}
-	for i := 0; i < len(expected); i++ {
-		c.Assert(expected[i], Equals, f.log[i])
-	}
-
+	expectedLog := []Entry{{Term: 1, Idx: 0, Cmd: ""}, {Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}}
+	c.Assert(expectedLog, DeepEquals, f.log)
 	c.Assert(f.commitIndex, Equals, Index(5))
 	c.Assert(f.lastApplied, Equals, Index(5))
+}
+
+func (t *T) TestFollowerTriggerElectionTimeoutWithEmptyTick(c *C) {
+	// given
+	cfg := Config {
+		cluster: Cluster {
+			Me:     1,
+			Others: []Id{2, 3},
+		},
+		electionTimeoutMin: 3,
+		electionTimeoutMax: 10,
+		electionTimeout: 3,
+		tickCnt: 0,
+	}
+
+	req := TickOrReq { Req: nil }
+
+	f := NewFollower(cfg)
+
+	// when
+	f.TakeAction(req)
+	f.TakeAction(req)
+	obj, _ := f.TakeAction(req)
+
+	// then
+	c.Assert(obj, Not(Equals), f)
+	if candidate, ok := obj.(*Candidate); !ok {
+		c.Fail()
+	} else {
+		c.Assert(candidate.log, DeepEquals, f.log)
+		c.Assert(candidate.votedFor, Equals, Id(0))
+		c.Assert(candidate.currentTerm, Equals, Term(f.currentTerm + 1))
+		c.Assert(candidate.cfg.tickCnt, Equals, int64(0))
+		legalElectionTimeout := candidate.cfg.electionTimeout >= candidate.cfg.electionTimeoutMin && candidate.cfg.electionTimeout <= candidate.cfg.electionTimeoutMax
+		c.Assert(legalElectionTimeout, Equals, true)
+	}
 }
