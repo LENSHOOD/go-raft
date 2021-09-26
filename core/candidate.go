@@ -14,18 +14,18 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			c.votedFor = c.cfg.cluster.Me
 
 			// send vote req
-			lastLogIndex := Index(-1)
-			lastLogTerm := Term(-1)
+			lastLogIndex := InvalidIndex
+			lastLogTerm := InvalidTerm
 			if lastIdx := len(c.log) - 1; lastIdx >= 0 {
 				lastLogIndex = c.log[lastIdx].Idx
 				lastLogTerm = c.log[lastIdx].Term
 			}
 			return c.broadcastReq(
 				&RequestVoteReq{
-					Term: c.currentTerm,
-					CandidateId: c.cfg.cluster.Me,
+					Term:         c.currentTerm,
+					CandidateId:  c.cfg.cluster.Me,
 					LastLogIndex: lastLogIndex,
-					LastLogTerm: lastLogTerm,
+					LastLogTerm:  lastLogTerm,
 				})
 		}
 
@@ -41,7 +41,7 @@ func NewCandidate(f *Follower) *Candidate {
 		RaftBase{
 			cfg:         f.cfg,
 			currentTerm: f.currentTerm + 1,
-			votedFor:    0,
+			votedFor:    InvalidId,
 			commitIndex: f.commitIndex,
 			lastApplied: f.lastApplied,
 			log:         f.log,

@@ -3,7 +3,14 @@ package core
 type Id int64
 
 const InvalidId Id = -1
+
 const All Id = -2
+
+// InvalidTerm is the init value of term, which will become 1 after first follower turn to candidate.
+const InvalidTerm Term = 0
+
+// InvalidIndex is the init value of any indexes. First valid index is 1.
+const InvalidIndex Index = 0
 
 type Term int64
 type Index int64
@@ -45,10 +52,10 @@ type RaftBase struct {
 func newRaftBase(cfg Config) RaftBase {
 	return RaftBase{
 		cfg:         cfg,
-		currentTerm: 0,
+		currentTerm: InvalidTerm,
 		votedFor:    InvalidId,
-		commitIndex: 0,
-		lastApplied: 0,
+		commitIndex: InvalidIndex,
+		lastApplied: InvalidIndex,
 		log:         make([]Entry, 0),
 	}
 }
@@ -62,18 +69,18 @@ func (r *RaftBase) moveState(to RaftObject) Msg {
 
 func (r *RaftBase) Resp(to Id, payload interface{}) Msg {
 	return Msg{
-		tp:   Resp,
-		from: r.cfg.cluster.Me,
-		to: to,
+		tp:      Resp,
+		from:    r.cfg.cluster.Me,
+		to:      to,
 		payload: payload,
 	}
 }
 
 func (r *RaftBase) pointReq(dest Id, payload interface{}) Msg {
 	return Msg{
-		tp:   Req,
-		from: r.cfg.cluster.Me,
-		to: dest,
+		tp:      Req,
+		from:    r.cfg.cluster.Me,
+		to:      dest,
 		payload: payload,
 	}
 }

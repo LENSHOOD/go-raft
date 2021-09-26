@@ -1,6 +1,7 @@
 package core
 
 type MsgType int
+
 const (
 	Tick MsgType = iota
 	MoveState
@@ -10,9 +11,9 @@ const (
 )
 
 type Msg struct {
-	tp MsgType
-	from Id
-	to Id
+	tp      MsgType
+	from    Id
+	to      Id
 	payload interface{}
 }
 
@@ -23,27 +24,27 @@ type TickOrReq struct {
 }
 
 type RequestVoteReq struct {
-	Term Term
-	CandidateId Id
+	Term         Term
+	CandidateId  Id
 	LastLogIndex Index
-	LastLogTerm Term
+	LastLogTerm  Term
 }
 
 type RequestVoteResp struct {
-	Term Term
+	Term        Term
 	VoteGranted bool
 }
 
 type AppendEntriesReq struct {
-	Term Term
-	LeaderId Id
+	Term         Term
+	LeaderId     Id
 	PrevLogIndex Index
-	PrevLogTerm Term
-	Entries []Entry
+	PrevLogTerm  Term
+	Entries      []Entry
 	LeaderCommit Index
 }
 
 type AppendEntriesResp struct {
-	Term Term
+	Term    Term
 	Success bool
 }

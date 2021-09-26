@@ -14,18 +14,18 @@ var _ = Suite(&T{})
 
 func (t *T) TestFollowerVoteWithInit(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
-		payload: &RequestVoteReq {
-				Term:        1,
-				CandidateId: 2,
+		payload: &RequestVoteReq{
+			Term:        1,
+			CandidateId: 2,
 		},
 	}
 
@@ -44,16 +44,16 @@ func (t *T) TestFollowerVoteWithInit(c *C) {
 
 func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
-		payload: &RequestVoteReq {
+		payload: &RequestVoteReq{
 			Term:        1,
 			CandidateId: 2,
 		},
@@ -74,16 +74,16 @@ func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
 
 func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
-		payload: &RequestVoteReq {
+		payload: &RequestVoteReq{
 			Term:        1,
 			CandidateId: 2,
 		},
@@ -105,16 +105,16 @@ func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 
 func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
-		payload: &RequestVoteReq {
+		payload: &RequestVoteReq{
 			Term:        2,
 			CandidateId: 3,
 		},
@@ -137,20 +137,20 @@ func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 
 func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
-		payload: &RequestVoteReq {
-			Term:        5,
-			CandidateId: 2,
+		payload: &RequestVoteReq{
+			Term:         5,
+			CandidateId:  2,
 			LastLogIndex: 1,
-			LastLogTerm: 2,
+			LastLogTerm:  2,
 		},
 	}
 
@@ -158,8 +158,8 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 	f.currentTerm = 4
 	f.log = append(f.log, Entry{
 		Term: 3,
-		Idx: 5,
-		Cmd: "",
+		Idx:  5,
+		Cmd:  "",
 	})
 
 	// when
@@ -174,26 +174,26 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 
 func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
-		payload: &RequestVoteReq {
-			Term:        5,
-			CandidateId: 2,
+		payload: &RequestVoteReq{
+			Term:         5,
+			CandidateId:  2,
 			LastLogIndex: 1,
-			LastLogTerm: 2,
+			LastLogTerm:  2,
 		},
 	}
 
 	f := NewFollower(cfg)
 	f.currentTerm = 4
-	f.log = append(f.log, Entry{Term: 2, Idx: 0, Cmd: "0"}, Entry{Term: 2, Idx: 1, Cmd: "1"}, Entry{Term: 2, Idx: 2, Cmd: "2"})
+	f.log = append(f.log, Entry{Term: 2, Idx: 1, Cmd: "1"}, Entry{Term: 2, Idx: 2, Cmd: "2"}, Entry{Term: 2, Idx: 3, Cmd: "3"})
 
 	// when
 	res := f.TakeAction(req)
@@ -207,16 +207,16 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C
 
 func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
-		payload: &AppendEntriesReq {
+		payload: &AppendEntriesReq{
 			Term: 1,
 		},
 	}
@@ -236,14 +236,14 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 
 func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
 		payload: &AppendEntriesReq{
 			Term:        4,
@@ -255,9 +255,9 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
-	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
-			Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
-			Entry{Term: 4, Idx: 5, Cmd: ""})
+	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""},
+		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
+		Entry{Term: 4, Idx: 5, Cmd: ""})
 
 	// when
 	res := f.TakeAction(req)
@@ -271,14 +271,14 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 
 func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
 		payload: &AppendEntriesReq{
 			Term:         4,
@@ -291,7 +291,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
-	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""},
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
 		Entry{Term: 4, Idx: 5, Cmd: ""})
 
@@ -307,14 +307,14 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 
 func (t *T) TestFollowerAppendLogToLast(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
 		payload: &AppendEntriesReq{
 			Term:         4,
@@ -328,7 +328,7 @@ func (t *T) TestFollowerAppendLogToLast(c *C) {
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
-	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""},
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
 		Entry{Term: 4, Idx: 5, Cmd: ""})
 
@@ -345,14 +345,14 @@ func (t *T) TestFollowerAppendLogToLast(c *C) {
 
 func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCommitIndexToLeaderCommit(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
 		payload: &AppendEntriesReq{
 			Term:         4,
@@ -367,7 +367,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
-	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""},
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
 		Entry{Term: 4, Idx: 5, Cmd: ""})
 
@@ -380,7 +380,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
 
-	expectedLog := []Entry{{Term: 1, Idx: 0, Cmd: ""}, {Term: 1, Idx: 1, Cmd: ""}, {Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}}
+	expectedLog := []Entry{{Term: 1, Idx: 1, Cmd: ""}, {Term: 2, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}, {Term: 2, Idx: 4, Cmd: ""}}
 	c.Assert(expectedLog, DeepEquals, f.log)
 	c.Assert(f.commitIndex, Equals, Index(3))
 	c.Assert(f.lastApplied, Equals, Index(3))
@@ -388,21 +388,21 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 
 func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenUpdateCommitIndexToLastNewEntry(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 	}
 
-	req := Msg {
+	req := Msg{
 		tp: Req,
 		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  1,
-			PrevLogIndex: 0,
+			PrevLogIndex: 1,
 			LeaderCommit: 8,
-			Entries:      []Entry{{Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}},
+			Entries:      []Entry{{Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}},
 		},
 	}
 
@@ -410,7 +410,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenU
 	f.currentTerm = 4
 
 	// Log (term:idx): 1:1 1:2 3:3 3:4 4:5
-	f.log = append(f.log, Entry{Term: 1, Idx: 0, Cmd: ""}, Entry{Term: 1, Idx: 1, Cmd: ""},
+	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""},
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
 		Entry{Term: 3, Idx: 5, Cmd: ""})
 
@@ -423,7 +423,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenU
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
 
-	expectedLog := []Entry{{Term: 1, Idx: 0, Cmd: ""}, {Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}}
+	expectedLog := []Entry{{Term: 1, Idx: 1, Cmd: ""}, {Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}}
 	c.Assert(expectedLog, DeepEquals, f.log)
 	c.Assert(f.commitIndex, Equals, Index(5))
 	c.Assert(f.lastApplied, Equals, Index(5))
@@ -431,18 +431,18 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenU
 
 func (t *T) TestFollowerTriggerElectionTimeoutWithEmptyTick(c *C) {
 	// given
-	cfg := Config {
-		cluster: Cluster {
+	cfg := Config{
+		cluster: Cluster{
 			Me:     1,
 			Others: []Id{2, 3},
 		},
 		electionTimeoutMin: 3,
 		electionTimeoutMax: 10,
-		electionTimeout: 3,
-		tickCnt: 0,
+		electionTimeout:    3,
+		tickCnt:            0,
 	}
 
-	req := Msg { tp: Tick }
+	req := Msg{tp: Tick}
 
 	f := NewFollower(cfg)
 
@@ -458,8 +458,8 @@ func (t *T) TestFollowerTriggerElectionTimeoutWithEmptyTick(c *C) {
 		c.Fail()
 	} else {
 		c.Assert(candidate.log, DeepEquals, f.log)
-		c.Assert(candidate.votedFor, Equals, Id(0))
-		c.Assert(candidate.currentTerm, Equals, f.currentTerm + 1)
+		c.Assert(candidate.votedFor, Equals, InvalidId)
+		c.Assert(candidate.currentTerm, Equals, f.currentTerm+1)
 		c.Assert(candidate.cfg.tickCnt, Not(Equals), int64(0))
 		legalElectionTimeout := candidate.cfg.electionTimeout >= candidate.cfg.electionTimeoutMin && candidate.cfg.electionTimeout <= candidate.cfg.electionTimeoutMax
 		c.Assert(legalElectionTimeout, Equals, true)
