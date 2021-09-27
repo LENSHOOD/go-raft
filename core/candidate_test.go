@@ -6,18 +6,7 @@ import (
 
 func (t *T) TestCandidateCanStartElection(c *C) {
 	// given
-	cfg := Config{
-		cluster: Cluster{
-			Me:     1,
-			Others: []Id{2, 3},
-		},
-		electionTimeoutMin: 3,
-		electionTimeoutMax: 10,
-		electionTimeout:    3,
-		tickCnt:            0,
-	}
-
-	f := NewFollower(cfg)
+	f := NewFollower(commCfg)
 	f.currentTerm = 4
 	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""},
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
@@ -44,4 +33,37 @@ func (t *T) TestCandidateCanStartElection(c *C) {
 
 	// self vote
 	c.Assert(cand.votedFor, Equals, cand.cfg.cluster.Me)
+	c.Assert(cand.voted[cand.cfg.cluster.Me], Equals, true)
+}
+
+func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
+	// given
+	voteFollowerId0 := commCfg.cluster.Others[1]
+	voteFollowerId1 := commCfg.cluster.Others[3]
+
+	cand := NewFollower(commCfg).toCandidate()
+
+	buildResp := func(id Id) Msg {
+		return Msg{
+			tp:   Resp,
+			from: id,
+			to:   commCfg.cluster.Me,
+			payload: &RequestVoteResp{
+				Term:        1,
+				VoteGranted: true,
+			},
+		}
+	}
+
+	// when
+	_ = cand.TakeAction(buildResp(voteFollowerId0))
+	_ = cand.TakeAction(buildResp(voteFollowerId1))
+
+	// then
+	c.Assert(cand.voted[voteFollowerId0], Equals, true)
+	c.Assert(cand.voted[voteFollowerId1], Equals, true)
+	c.Assert(cand.voted[cand.cfg.cluster.Me], Equals, true)
+
+	c.Assert(cand.voted[commCfg.cluster.Others[0]], Equals, false)
+	c.Assert(cand.voted[commCfg.cluster.Others[2]], Equals, false)
 }

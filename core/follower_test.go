@@ -2,15 +2,7 @@ package core
 
 import (
 	. "gopkg.in/check.v1"
-	"testing"
 )
-
-// hook up go-check to go testing
-func Test(t *testing.T) { TestingT(t) }
-
-type T struct{}
-
-var _ = Suite(&T{})
 
 func (t *T) TestFollowerVoteWithInit(c *C) {
 	// given
@@ -458,7 +450,7 @@ func (t *T) TestFollowerTriggerElectionTimeoutWithEmptyTick(c *C) {
 		c.Fail()
 	} else {
 		c.Assert(candidate.log, DeepEquals, f.log)
-		c.Assert(candidate.votedFor, Equals, InvalidId)
+		c.Assert(candidate.votedFor, Equals, f.cfg.cluster.Me)
 		c.Assert(candidate.currentTerm, Equals, f.currentTerm+1)
 		c.Assert(candidate.cfg.tickCnt, Not(Equals), int64(0))
 		legalElectionTimeout := candidate.cfg.electionTimeout >= candidate.cfg.electionTimeoutMin && candidate.cfg.electionTimeout <= candidate.cfg.electionTimeoutMax

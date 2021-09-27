@@ -2,7 +2,10 @@ package core
 
 import "math/rand"
 
-type Candidate struct{ RaftBase }
+type Candidate struct{
+	RaftBase
+	voted map[Id]bool
+}
 
 func (c *Candidate) TakeAction(msg Msg) Msg {
 	switch msg.tp {
@@ -10,9 +13,6 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 		c.cfg.tickCnt++
 
 		if c.cfg.tickCnt == c.cfg.electionTimeout {
-			// vote myself
-			c.votedFor = c.cfg.cluster.Me
-
 			// send vote req
 			lastLogIndex := InvalidIndex
 			lastLogTerm := InvalidTerm
@@ -29,6 +29,17 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 				})
 		}
 
+	case Resp:
+		c.cfg.tickCnt = 0
+		switch msg.payload.(type) {
+		case *RequestVoteResp:
+			resp := msg.payload.(*RequestVoteResp)
+			if resp.VoteGranted {
+				c.voted[msg.from] = true
+			}
+
+			return NullMsg
+		}
 	default:
 	}
 
@@ -46,12 +57,17 @@ func NewCandidate(f *Follower) *Candidate {
 			lastApplied: f.lastApplied,
 			log:         f.log,
 		},
+		make(map[Id]bool),
 	}
 
 	electionTimeout := rand.Int63n(f.cfg.electionTimeoutMax-f.cfg.electionTimeoutMin) + f.cfg.electionTimeoutMin
 	c.cfg.electionTimeout = electionTimeout
 	// force candidate start election at first tick
 	c.cfg.tickCnt = electionTimeout - 1
+
+	// vote self
+	c.votedFor = c.cfg.cluster.Me
+	c.voted[c.cfg.cluster.Me] = true
 
 	return c
 }
