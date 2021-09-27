@@ -186,3 +186,32 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	c.Assert(res2, Equals, NullMsg)
 	c.Assert(res3, Equals, NullMsg)
 }
+
+func (t *T) TestCandidateTriggerElectionTimeoutWithEmptyTick(c *C) {
+	// given
+	currTerm := Term(1)
+	cand := NewFollower(commCfg).toCandidate()
+	cand.currentTerm = currTerm
+	cand.cfg.electionTimeout = 3
+	cand.cfg.tickCnt = 2
+
+	req := Msg{tp: Tick}
+
+	// when
+	res := cand.TakeAction(req)
+
+	// then
+	c.Assert(res.tp, Equals, Req)
+	c.Assert(res.from, Equals, cand.cfg.cluster.Me)
+	c.Assert(res.to, Equals, All)
+	if rv, ok := res.payload.(*RequestVoteReq); !ok {
+		c.Fail()
+	} else {
+		c.Assert(rv.Term, Equals, currTerm + 1)
+		c.Assert(rv.CandidateId, Equals, cand.cfg.cluster.Me)
+	}
+
+	// re-random timeout
+	legalElectionTimeout := cand.cfg.electionTimeout >= cand.cfg.electionTimeoutMin && cand.cfg.electionTimeout <= cand.cfg.electionTimeoutMax
+	c.Assert(legalElectionTimeout, Equals, true)
+}

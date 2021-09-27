@@ -13,6 +13,11 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 		c.cfg.tickCnt++
 
 		if c.cfg.tickCnt == c.cfg.electionTimeout {
+			c.currentTerm++
+
+			// reset timeout
+			c.cfg.electionTimeout = rand.Int63n(c.cfg.electionTimeoutMax-c.cfg.electionTimeoutMin) + c.cfg.electionTimeoutMin
+
 			// send vote req
 			lastLogIndex := InvalidIndex
 			lastLogTerm := InvalidTerm
@@ -90,7 +95,7 @@ func NewCandidate(f *Follower) *Candidate {
 	c := &Candidate{
 		RaftBase{
 			cfg:         f.cfg,
-			currentTerm: f.currentTerm + 1,
+			currentTerm: f.currentTerm,
 			votedFor:    InvalidId,
 			commitIndex: f.commitIndex,
 			lastApplied: f.lastApplied,
@@ -99,10 +104,8 @@ func NewCandidate(f *Follower) *Candidate {
 		make(map[Id]bool),
 	}
 
-	electionTimeout := rand.Int63n(f.cfg.electionTimeoutMax-f.cfg.electionTimeoutMin) + f.cfg.electionTimeoutMin
-	c.cfg.electionTimeout = electionTimeout
 	// force candidate start election at first tick
-	c.cfg.tickCnt = electionTimeout - 1
+	c.cfg.tickCnt = c.cfg.electionTimeout - 1
 
 	// vote self
 	c.votedFor = c.cfg.cluster.Me
