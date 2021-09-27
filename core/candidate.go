@@ -64,6 +64,9 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			req := msg.payload.(*RequestVoteReq)
 			if req.Term < c.currentTerm {
 				break
+			} else if req.Term > c.currentTerm {
+				c.currentTerm = req.Term
+				return c.moveState(c.toFollower())
 			}
 		}
 	default:

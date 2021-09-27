@@ -95,6 +95,33 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 	}
 }
 
+func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
+	// given
+	cand := NewFollower(commCfg).toCandidate()
+
+	newCandidate := commCfg.cluster.Others[1]
+	resp := Msg{
+		tp:   Req,
+		from: newCandidate,
+		to:   commCfg.cluster.Me,
+		payload: &RequestVoteReq{
+			Term:        cand.currentTerm + 1,
+			CandidateId: newCandidate,
+		},
+	}
+
+	// when
+	res := cand.TakeAction(resp)
+
+	// then
+	c.Assert(res.tp, Equals, MoveState)
+	if f, ok := res.payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (resp.payload.(*RequestVoteReq)).Term)
+	} else {
+		c.Fail()
+	}
+}
+
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 	// given
 	cand := NewFollower(commCfg).toCandidate()
