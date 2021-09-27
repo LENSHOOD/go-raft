@@ -36,15 +36,37 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			resp := msg.payload.(*RequestVoteResp)
 			if resp.VoteGranted {
 				c.voted[msg.from] = true
+			} else if resp.Term > c.currentTerm {
+				c.currentTerm = resp.Term
+				return c.moveState(c.toFollower())
 			}
+		}
 
-			return NullMsg
+	case Req:
+		c.cfg.tickCnt = 0
+		switch msg.payload.(type) {
+		case *AppendEntriesReq:
+			req := msg.payload.(*AppendEntriesReq)
+			if req.Term >= c.currentTerm {
+				c.currentTerm = req.Term
+				return c.moveState(c.toFollower())
+			}
 		}
 	default:
 	}
 
 	// return null for meaningless msg
 	return NullMsg
+}
+
+func (c *Candidate) toFollower() *Follower {
+	f := NewFollower(c.cfg)
+	f.currentTerm = c.currentTerm
+	f.log = c.log
+	f.commitIndex = c.commitIndex
+	f.lastApplied = c.lastApplied
+
+	return f
 }
 
 func NewCandidate(f *Follower) *Candidate {

@@ -67,3 +67,57 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 	c.Assert(cand.voted[commCfg.cluster.Others[0]], Equals, false)
 	c.Assert(cand.voted[commCfg.cluster.Others[2]], Equals, false)
 }
+
+func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
+	// given
+	cand := NewFollower(commCfg).toCandidate()
+
+	voteFollowerId0 := commCfg.cluster.Others[1]
+	resp := Msg{
+		tp:   Resp,
+		from: voteFollowerId0,
+		to:   commCfg.cluster.Me,
+		payload: &RequestVoteResp{
+			Term:        cand.currentTerm + 1,
+			VoteGranted: false,
+		},
+	}
+
+	// when
+	res := cand.TakeAction(resp)
+
+	// then
+	c.Assert(res.tp, Equals, MoveState)
+	if f, ok := res.payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (resp.payload.(*RequestVoteResp)).Term)
+	} else {
+		c.Fail()
+	}
+}
+
+func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
+	// given
+	cand := NewFollower(commCfg).toCandidate()
+	cand.currentTerm = 3
+
+	req := Msg{
+		tp: Req,
+		payload: &AppendEntriesReq{
+			Term:         4,
+			PrevLogTerm:  4,
+			PrevLogIndex: 5,
+			Entries:      []Entry{{Term: 4, Idx: 6, Cmd: ""}},
+		},
+	}
+
+	// when
+	res := cand.TakeAction(req)
+
+	// then
+	c.Assert(res.tp, Equals, MoveState)
+	if f, ok := res.payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (req.payload.(*AppendEntriesReq)).Term)
+	} else {
+		c.Fail()
+	}
+}
