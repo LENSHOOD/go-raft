@@ -121,3 +121,41 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 		c.Fail()
 	}
 }
+
+func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
+	// given
+	cand := NewFollower(commCfg).toCandidate()
+	cand.currentTerm = 2
+
+
+	// when
+	msg1 := Msg{
+		tp: Req,
+		payload: &AppendEntriesReq{
+			Term:         1,
+		},
+	}
+	res1 := cand.TakeAction(msg1)
+
+	msg2 := Msg{
+		tp:   Resp,
+		payload: &RequestVoteResp{
+			Term:        1,
+			VoteGranted: true,
+		},
+	}
+	res2 := cand.TakeAction(msg2)
+
+	msg3 := Msg{
+		tp:   Req,
+		payload: &RequestVoteReq{
+			Term:        1,
+		},
+	}
+	res3 := cand.TakeAction(msg3)
+
+	// then
+	c.Assert(res1, Equals, NullMsg)
+	c.Assert(res2, Equals, NullMsg)
+	c.Assert(res3, Equals, NullMsg)
+}

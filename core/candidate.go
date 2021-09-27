@@ -34,6 +34,10 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 		switch msg.payload.(type) {
 		case *RequestVoteResp:
 			resp := msg.payload.(*RequestVoteResp)
+			if resp.Term < c.currentTerm {
+				break
+			}
+
 			if resp.VoteGranted {
 				c.voted[msg.from] = true
 			} else if resp.Term > c.currentTerm {
@@ -47,9 +51,19 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 		switch msg.payload.(type) {
 		case *AppendEntriesReq:
 			req := msg.payload.(*AppendEntriesReq)
+			if req.Term < c.currentTerm {
+				break
+			}
+
 			if req.Term >= c.currentTerm {
 				c.currentTerm = req.Term
 				return c.moveState(c.toFollower())
+			}
+
+		case *RequestVoteReq:
+			req := msg.payload.(*RequestVoteReq)
+			if req.Term < c.currentTerm {
+				break
 			}
 		}
 	default:
