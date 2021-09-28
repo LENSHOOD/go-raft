@@ -64,3 +64,12 @@ type AppendEntriesResp struct {
 func (rpc *AppendEntriesResp) GetTerm() Term {
 	return rpc.Term
 }
+
+type CmdReq struct {
+	Cmd Command
+}
+
+type CmdResp struct {
+	Cmd Command
+	Success bool
+}
