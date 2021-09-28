@@ -215,3 +215,45 @@ func (t *T) TestCandidateTriggerElectionTimeoutWithEmptyTick(c *C) {
 	legalElectionTimeout := cand.cfg.electionTimeout >= cand.cfg.electionTimeoutMin && cand.cfg.electionTimeout <= cand.cfg.electionTimeoutMax
 	c.Assert(legalElectionTimeout, Equals, true)
 }
+
+func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
+	// given
+	voteFollowerId0 := commCfg.cluster.Others[1]
+	voteFollowerId1 := commCfg.cluster.Others[3]
+
+	cand := NewFollower(commCfg).toCandidate()
+	cand.currentTerm = 3
+	cand.log = append(cand.log, Entry{Term: 1, Idx: 1, Cmd: ""},
+		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
+		Entry{Term: 3, Idx: 5, Cmd: ""})
+
+	buildResp := func(id Id) Msg {
+		return Msg{
+			tp:   Resp,
+			from: id,
+			to:   commCfg.cluster.Me,
+			payload: &RequestVoteResp{
+				Term:        3,
+				VoteGranted: true,
+			},
+		}
+	}
+
+	// when
+	_ = cand.TakeAction(buildResp(voteFollowerId0))
+	res := cand.TakeAction(buildResp(voteFollowerId1))
+
+	// then
+	c.Assert(len(cand.voted), Equals, 3)
+	c.Assert(res.tp, Equals, MoveState)
+	if l, ok := res.payload.(*Leader); ok {
+		lastLogIndex := cand.log[len(cand.log) - 1].Idx
+		for v := range cand.cfg.cluster.Others {
+			c.Assert(l.nextIndex[Id(v)], Equals, lastLogIndex)
+			c.Assert(l.matchIndex[Id(v)], Equals, InvalidIndex)
+		}
+	} else {
+		c.Fail()
+		c.Logf("Should move to leader.")
+	}
+}

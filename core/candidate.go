@@ -2,7 +2,7 @@ package core
 
 import "math/rand"
 
-type Candidate struct{
+type Candidate struct {
 	RaftBase
 	voted map[Id]bool
 }
@@ -49,6 +49,18 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 				c.currentTerm = resp.Term
 				return c.moveState(c.toFollower())
 			}
+
+			voteCnt := 0
+			for v := range c.cfg.cluster.Others {
+				if c.voted[Id(v)] {
+					voteCnt++
+				}
+			}
+
+			majorityCnt := (len(c.cfg.cluster.Others)+1)/2 + 1
+			if voteCnt+1 >= majorityCnt {
+				return c.moveState(c.toLeader())
+			}
 		}
 
 	case Req:
@@ -89,6 +101,10 @@ func (c *Candidate) toFollower() *Follower {
 	f.lastApplied = c.lastApplied
 
 	return f
+}
+
+func (c *Candidate) toLeader() *Leader {
+	return NewLeader(c)
 }
 
 func NewCandidate(f *Follower) *Candidate {
