@@ -8,6 +8,11 @@ type Candidate struct {
 }
 
 func (c *Candidate) TakeAction(msg Msg) Msg {
+	// deal with msg term != currentTerm
+	if msg.tp == Req || msg.tp == Resp {
+
+	}
+
 	switch msg.tp {
 	case Tick:
 		c.cfg.tickCnt++
@@ -34,21 +39,21 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 				})
 		}
 
-	case Resp:
+	case Resp, Req:
 		c.cfg.tickCnt = 0
+
+		recvTerm := msg.payload.(Rpc).GetTerm()
+		if recvTerm < c.currentTerm {
+			return NullMsg
+		} else if recvTerm > c.currentTerm {
+			c.currentTerm = recvTerm
+			return c.moveState(c.toFollower())
+		}
+
 		switch msg.payload.(type) {
 		case *RequestVoteResp:
 			resp := msg.payload.(*RequestVoteResp)
-			if resp.Term < c.currentTerm {
-				break
-			}
-
-			if resp.VoteGranted {
-				c.voted[msg.from] = true
-			} else if resp.Term > c.currentTerm {
-				c.currentTerm = resp.Term
-				return c.moveState(c.toFollower())
-			}
+			c.voted[msg.from] = resp.VoteGranted
 
 			voteCnt := 0
 			for v := range c.cfg.cluster.Others {
@@ -60,30 +65,6 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			majorityCnt := (len(c.cfg.cluster.Others)+1)/2 + 1
 			if voteCnt+1 >= majorityCnt {
 				return c.moveState(c.toLeader())
-			}
-		}
-
-	case Req:
-		c.cfg.tickCnt = 0
-		switch msg.payload.(type) {
-		case *AppendEntriesReq:
-			req := msg.payload.(*AppendEntriesReq)
-			if req.Term < c.currentTerm {
-				break
-			}
-
-			if req.Term >= c.currentTerm {
-				c.currentTerm = req.Term
-				return c.moveState(c.toFollower())
-			}
-
-		case *RequestVoteReq:
-			req := msg.payload.(*RequestVoteReq)
-			if req.Term < c.currentTerm {
-				break
-			} else if req.Term > c.currentTerm {
-				c.currentTerm = req.Term
-				return c.moveState(c.toFollower())
 			}
 		}
 	default:

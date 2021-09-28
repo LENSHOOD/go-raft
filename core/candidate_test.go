@@ -42,6 +42,7 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 	voteFollowerId1 := commCfg.cluster.Others[3]
 
 	cand := NewFollower(commCfg).toCandidate()
+	cand.currentTerm = 1
 
 	buildResp := func(id Id) Msg {
 		return Msg{

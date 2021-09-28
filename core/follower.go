@@ -16,8 +16,16 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 			return f.moveState(f.toCandidate())
 		}
 
-	case Req:
+	case Req, Resp:
 		f.cfg.tickCnt = 0
+
+		recvTerm := msg.payload.(Rpc).GetTerm()
+		// update term and clear vote when receive newer term
+		if recvTerm > f.currentTerm {
+			f.currentTerm = recvTerm
+			f.votedFor = InvalidId
+		}
+
 		switch msg.payload.(type) {
 		case *RequestVoteReq:
 			return f.Resp(msg.from, f.vote(msg.payload.(*RequestVoteReq)))
@@ -49,7 +57,7 @@ func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 		return buildResp(false)
 	}
 
-	if req.Term == f.currentTerm && f.votedFor != InvalidId && f.votedFor != req.CandidateId {
+	if f.votedFor != InvalidId && f.votedFor != req.CandidateId {
 		return buildResp(false)
 	}
 
@@ -60,7 +68,6 @@ func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 		}
 	}
 
-	f.currentTerm = req.Term
 	f.votedFor = req.CandidateId
 
 	return buildResp(true)
@@ -84,7 +91,6 @@ func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 	if req.Term < f.currentTerm {
 		return buildResp(false)
 	}
-	f.currentTerm = req.Term
 
 	matched, logPos := matchPrev(f.log, req.PrevLogTerm, req.PrevLogIndex)
 	if !matched {

@@ -160,7 +160,7 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 	// then
 	c.Assert(res.tp, Equals, Resp)
 	voteResp := res.payload.(*RequestVoteResp)
-	c.Assert(voteResp.Term, Equals, Term(4))
+	c.Assert(voteResp.Term, Equals, Term(5))
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
 
@@ -193,7 +193,7 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C
 	// then
 	c.Assert(res.tp, Equals, Resp)
 	voteResp := res.payload.(*RequestVoteResp)
-	c.Assert(voteResp.Term, Equals, Term(4))
+	c.Assert(voteResp.Term, Equals, Term(5))
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
 

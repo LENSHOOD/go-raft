@@ -19,8 +19,8 @@ type Msg struct {
 
 var NullMsg = Msg{tp: Null}
 
-type TickOrReq struct {
-	Req interface{}
+type Rpc interface {
+	GetTerm() Term
 }
 
 type RequestVoteReq struct {
@@ -30,9 +30,17 @@ type RequestVoteReq struct {
 	LastLogTerm  Term
 }
 
+func (rpc *RequestVoteReq) GetTerm() Term {
+	return rpc.Term
+}
+
 type RequestVoteResp struct {
 	Term        Term
 	VoteGranted bool
+}
+
+func (rpc *RequestVoteResp) GetTerm() Term {
+	return rpc.Term
 }
 
 type AppendEntriesReq struct {
@@ -44,7 +52,15 @@ type AppendEntriesReq struct {
 	LeaderCommit Index
 }
 
+func (rpc *AppendEntriesReq) GetTerm() Term {
+	return rpc.Term
+}
+
 type AppendEntriesResp struct {
 	Term    Term
 	Success bool
+}
+
+func (rpc *AppendEntriesResp) GetTerm() Term {
+	return rpc.Term
 }
