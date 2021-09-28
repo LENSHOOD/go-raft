@@ -8,11 +8,6 @@ type Candidate struct {
 }
 
 func (c *Candidate) TakeAction(msg Msg) Msg {
-	// deal with msg term != currentTerm
-	if msg.tp == Req || msg.tp == Resp {
-
-	}
-
 	switch msg.tp {
 	case Tick:
 		c.cfg.tickCnt++
@@ -67,7 +62,6 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 				return c.moveState(c.toLeader())
 			}
 		}
-	default:
 	}
 
 	// return null for meaningless msg

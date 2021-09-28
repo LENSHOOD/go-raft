@@ -32,8 +32,6 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 		case *AppendEntriesReq:
 			return f.Resp(msg.from, f.append(msg.payload.(*AppendEntriesReq)))
 		}
-
-	default:
 	}
 
 	// return null for meaningless msg
