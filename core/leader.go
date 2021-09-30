@@ -9,7 +9,7 @@ type clientCtx struct {
 type Leader struct {
 	RaftBase
 	heartbeatIntervalCnt int
-	entryCtxs            map[Index]clientCtx
+	clientCtxs           map[Index]clientCtx
 	nextIndex            map[Id]Index
 	matchIndex           map[Id]Index
 }
@@ -35,6 +35,30 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 		switch msg.payload.(type) {
 		case *CmdReq:
 			return l.broadcastReq(l.appendLogFromCmd(msg.from, msg.payload.(*CmdReq).Cmd))
+		case *AppendEntriesResp:
+			resp := msg.payload.(*AppendEntriesResp)
+			if resp.Success {
+				l.matchIndex[msg.from]++
+			}
+
+			majorityCnt := 1
+			self := l.matchIndex[msg.from]
+			for _, v := range l.matchIndex {
+				if v >= self {
+					majorityCnt++
+				}
+			}
+
+			if majorityCnt >= l.cfg.cluster.majorityCnt() {
+				if v, ok := l.clientCtxs[self]; ok {
+					l.commitIndex = self
+					// TODO: Apply cmd to state machine, consider add a apply channel. Apply from lastApplied to commitIndex
+					l.lastApplied = l.commitIndex
+
+					delete(l.clientCtxs, self)
+					return l.pointReq(v.clientId, &CmdResp{Success: true})
+				}
+			}
 		}
 	}
 	return NullMsg
@@ -54,7 +78,7 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) *AppendEntriesReq {
 		Cmd:  cmd,
 	}
 	l.log = append(l.log, newEntry)
-	l.entryCtxs[newEntry.Idx] = clientCtx{clientId: from}
+	l.clientCtxs[newEntry.Idx] = clientCtx{clientId: from}
 
 	return &AppendEntriesReq{
 		Term:         l.currentTerm,

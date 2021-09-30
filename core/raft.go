@@ -31,6 +31,10 @@ type Cluster struct {
 	Others []Id
 }
 
+func (c * Cluster) majorityCnt() int {
+	return len(c.Others) / 2 + 1
+}
+
 type Config struct {
 	cluster            Cluster
 	leader             Id

@@ -70,6 +70,5 @@ type CmdReq struct {
 }
 
 type CmdResp struct {
-	Cmd Command
 	Success bool
 }

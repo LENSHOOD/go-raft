@@ -37,9 +37,9 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
 
 	cmdReqMsg := Msg{
-		tp: Req,
+		tp:   Req,
 		from: Id(999),
-		to: l.cfg.leader,
+		to:   l.cfg.leader,
 		payload: &CmdReq{
 			Cmd: "test",
 		},
@@ -65,6 +65,85 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	}
 
 	// then client context
-	c.Assert(len(l.entryCtxs), Equals, 1)
-	c.Assert(l.entryCtxs[Index(3)].clientId, Equals, Id(999))
+	c.Assert(len(l.clientCtxs), Equals, 1)
+	c.Assert(l.clientCtxs[Index(3)].clientId, Equals, Id(999))
+}
+
+func (t *T) TestLeaderShouldIncrementMatchIndexWhenReceiveSuccessRespFromFollower(c *C) {
+	// given
+	l := NewFollower(commCfg).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
+
+	l.matchIndex[Id(2)] = 0
+
+	resp := Msg{
+		tp:   Resp,
+		from: Id(2),
+		to:   l.cfg.leader,
+		payload: &AppendEntriesResp{
+			Term:    1,
+			Success: true,
+		},
+	}
+
+	// when recv two success resp
+	_ = l.TakeAction(resp)
+	_ = l.TakeAction(resp)
+
+	// then
+	c.Assert(l.matchIndex[Id(2)], Equals, Index(2))
+}
+
+func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiveMajoritySuccesses(c *C) {
+	// given
+	l := NewFollower(commCfg).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
+
+	l.matchIndex[Id(2)] = 1
+	l.matchIndex[Id(3)] = 1
+	l.matchIndex[Id(4)] = 0
+	l.matchIndex[Id(5)] = 1
+	l.clientCtxs[Index(2)] = clientCtx{clientId: Id(999)}
+
+	buildResp := func(id Id) Msg {
+		return Msg{
+			tp:   Resp,
+			from: id,
+			to:   l.cfg.leader,
+			payload: &AppendEntriesResp{
+				Term:    1,
+				Success: true,
+			},
+		}
+	}
+
+	// when
+	res1 := l.TakeAction(buildResp(2))
+	res2 := l.TakeAction(buildResp(3))
+
+	// then
+	c.Assert(l.matchIndex[Id(2)], Equals, Index(2))
+	c.Assert(l.matchIndex[Id(3)], Equals, Index(2))
+	c.Assert(l.matchIndex[Id(4)], Equals, Index(0))
+	c.Assert(l.matchIndex[Id(5)], Equals, Index(1))
+
+	c.Assert(res1, Equals, NullMsg)
+	if payload, ok := res2.payload.(*CmdResp); ok {
+		c.Assert(payload.Success, Equals, true)
+		c.Assert(res2.to, Equals, Id(999))
+
+		_, exist := l.clientCtxs[Index(2)]
+		c.Assert(exist, Equals, false)
+
+		c.Assert(l.commitIndex, Equals, Index(2))
+	} else {
+		c.Fail()
+		c.Logf("Should get CmdResp")
+	}
 }
