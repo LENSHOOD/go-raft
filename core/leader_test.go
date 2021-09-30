@@ -64,9 +64,7 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 		c.Logf("Payload should be AppendEntriesReq")
 	}
 
-	// then entry context
+	// then client context
 	c.Assert(len(l.entryCtxs), Equals, 1)
 	c.Assert(l.entryCtxs[Index(3)].clientId, Equals, Id(999))
-	c.Assert(l.entryCtxs[Index(3)].majorityCnt, Equals, 1)
-	c.Assert(l.entryCtxs[Index(3)].entryIdx, Equals, Index(3))
 }

@@ -2,16 +2,14 @@ package core
 
 var heartbeatInterval = 3
 
-type entryCtx struct {
-	clientId    Id
-	majorityCnt int
-	entryIdx    Index
+type clientCtx struct {
+	clientId Id
 }
 
 type Leader struct {
 	RaftBase
 	heartbeatIntervalCnt int
-	entryCtxs            map[Index]entryCtx
+	entryCtxs            map[Index]clientCtx
 	nextIndex            map[Id]Index
 	matchIndex           map[Id]Index
 }
@@ -36,38 +34,36 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 	case Req, Resp:
 		switch msg.payload.(type) {
 		case *CmdReq:
-			lastIndex := InvalidIndex
-			lastTerm := InvalidTerm
-			if len(l.log) >= 0 {
-				lastIndex = l.log[len(l.log)-1].Idx
-				lastTerm = l.log[len(l.log)-1].Term
-			}
-
-			newEntry := Entry{
-				Term: l.currentTerm,
-				Idx:  lastIndex + 1,
-				Cmd:  msg.payload.(*CmdReq).Cmd,
-			}
-			l.log = append(l.log, newEntry)
-
-			ctx := entryCtx{
-				clientId: msg.from,
-				majorityCnt: 1,
-				entryIdx: newEntry.Idx,
-			}
-			l.entryCtxs[newEntry.Idx] = ctx
-
-			return l.broadcastReq(&AppendEntriesReq{
-				Term:         l.currentTerm,
-				LeaderId:     l.cfg.leader,
-				PrevLogIndex: lastIndex,
-				PrevLogTerm:  lastTerm,
-				Entries:      []Entry{newEntry},
-				LeaderCommit: l.commitIndex,
-			})
+			return l.broadcastReq(l.appendLogFromCmd(msg.from, msg.payload.(*CmdReq).Cmd))
 		}
 	}
 	return NullMsg
+}
+
+func (l *Leader) appendLogFromCmd(from Id, cmd Command) *AppendEntriesReq {
+	lastIndex := InvalidIndex
+	lastTerm := InvalidTerm
+	if len(l.log) >= 0 {
+		lastIndex = l.log[len(l.log)-1].Idx
+		lastTerm = l.log[len(l.log)-1].Term
+	}
+
+	newEntry := Entry{
+		Term: l.currentTerm,
+		Idx:  lastIndex + 1,
+		Cmd:  cmd,
+	}
+	l.log = append(l.log, newEntry)
+	l.entryCtxs[newEntry.Idx] = clientCtx{clientId: from}
+
+	return &AppendEntriesReq{
+		Term:         l.currentTerm,
+		LeaderId:     l.cfg.leader,
+		PrevLogIndex: lastIndex,
+		PrevLogTerm:  lastTerm,
+		Entries:      []Entry{newEntry},
+		LeaderCommit: l.commitIndex,
+	}
 }
 
 func NewLeader(c *Candidate) *Leader {
@@ -81,7 +77,7 @@ func NewLeader(c *Candidate) *Leader {
 			log:         c.log,
 		},
 		0,
-		make(map[Index]entryCtx),
+		make(map[Index]clientCtx),
 		make(map[Id]Index),
 		make(map[Id]Index),
 	}
