@@ -34,10 +34,10 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 				})
 		}
 
-	case Resp, Req:
+	case Rpc:
 		c.cfg.tickCnt = 0
 
-		recvTerm := msg.payload.(Rpc).GetTerm()
+		recvTerm := msg.payload.(TermHolder).GetTerm()
 		if recvTerm < c.currentTerm {
 			return NullMsg
 		} else if recvTerm > c.currentTerm {

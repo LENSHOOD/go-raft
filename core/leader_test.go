@@ -18,7 +18,7 @@ func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 	res := l.TakeAction(tick)
 
 	// then
-	c.Assert(res.tp, Equals, Req)
+	c.Assert(res.tp, Equals, Rpc)
 	c.Assert(res.to, Equals, All)
 	if req, ok := res.payload.(*AppendEntriesReq); ok {
 		c.Assert(len(req.Entries), Equals, 0)
@@ -37,7 +37,7 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
 
 	cmdReqMsg := Msg{
-		tp:   Req,
+		tp:   Cmd,
 		from: Id(999),
 		to:   l.cfg.leader,
 		payload: &CmdReq{
@@ -49,7 +49,7 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	res := l.TakeAction(cmdReqMsg)
 
 	// then msg
-	c.Assert(res.tp, Equals, Req)
+	c.Assert(res.tp, Equals, Rpc)
 	c.Assert(res.to, Equals, All)
 
 	// then payload
@@ -80,7 +80,7 @@ func (t *T) TestLeaderShouldIncrementMatchIndexWhenReceiveSuccessRespFromFollowe
 	l.matchIndex[Id(2)] = 0
 
 	resp := Msg{
-		tp:   Resp,
+		tp:   Rpc,
 		from: Id(2),
 		to:   l.cfg.leader,
 		payload: &AppendEntriesResp{
@@ -113,7 +113,7 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 
 	buildResp := func(id Id) Msg {
 		return Msg{
-			tp:   Resp,
+			tp:   Rpc,
 			from: id,
 			to:   l.cfg.leader,
 			payload: &AppendEntriesResp{
@@ -147,3 +147,31 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 		c.Logf("Should get CmdResp")
 	}
 }
+
+func (t *T) TestLeaderWillBackToFollowerWhenReceiveAnyRpcWithNewTerm(c *C) {
+	// given
+	l := NewFollower(commCfg).toCandidate().toLeader()
+	l.currentTerm = 3
+
+	req := Msg{
+		tp: Rpc,
+		payload: &AppendEntriesReq{
+			Term:         4,
+			PrevLogTerm:  4,
+			PrevLogIndex: 5,
+			Entries:      []Entry{{Term: 4, Idx: 6, Cmd: ""}},
+		},
+	}
+
+	// when
+	res := l.TakeAction(req)
+
+	// then
+	c.Assert(res.tp, Equals, MoveState)
+	if f, ok := res.payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (req.payload.(*AppendEntriesReq)).Term)
+	} else {
+		c.Fail()
+	}
+}
+

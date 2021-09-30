@@ -19,7 +19,7 @@ func (t *T) TestCandidateCanStartElection(c *C) {
 	res := cand.TakeAction(tick)
 
 	// then
-	c.Assert(res.tp, Equals, Req)
+	c.Assert(res.tp, Equals, Rpc)
 	c.Assert(res.from, Equals, cand.cfg.cluster.Me)
 	c.Assert(res.to, Equals, All)
 	if rv, ok := res.payload.(*RequestVoteReq); !ok {
@@ -46,7 +46,7 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 
 	buildResp := func(id Id) Msg {
 		return Msg{
-			tp:   Resp,
+			tp:   Rpc,
 			from: id,
 			to:   commCfg.cluster.Me,
 			payload: &RequestVoteResp{
@@ -75,7 +75,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 
 	voteFollowerId0 := commCfg.cluster.Others[1]
 	resp := Msg{
-		tp:   Resp,
+		tp:   Rpc,
 		from: voteFollowerId0,
 		to:   commCfg.cluster.Me,
 		payload: &RequestVoteResp{
@@ -102,7 +102,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
 
 	newCandidate := commCfg.cluster.Others[1]
 	resp := Msg{
-		tp:   Req,
+		tp:   Rpc,
 		from: newCandidate,
 		to:   commCfg.cluster.Me,
 		payload: &RequestVoteReq{
@@ -129,7 +129,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 	cand.currentTerm = 3
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  4,
@@ -158,7 +158,7 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 
 	// when
 	msg1 := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &AppendEntriesReq{
 			Term:         1,
 		},
@@ -166,7 +166,7 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	res1 := cand.TakeAction(msg1)
 
 	msg2 := Msg{
-		tp:   Resp,
+		tp: Rpc,
 		payload: &RequestVoteResp{
 			Term:        1,
 			VoteGranted: true,
@@ -175,7 +175,7 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	res2 := cand.TakeAction(msg2)
 
 	msg3 := Msg{
-		tp:   Req,
+		tp: Rpc,
 		payload: &RequestVoteReq{
 			Term:        1,
 		},
@@ -202,7 +202,7 @@ func (t *T) TestCandidateTriggerElectionTimeoutWithEmptyTick(c *C) {
 	res := cand.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Req)
+	c.Assert(res.tp, Equals, Rpc)
 	c.Assert(res.from, Equals, cand.cfg.cluster.Me)
 	c.Assert(res.to, Equals, All)
 	if rv, ok := res.payload.(*RequestVoteReq); !ok {
@@ -230,7 +230,7 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 
 	buildResp := func(id Id) Msg {
 		return Msg{
-			tp:   Resp,
+			tp:   Rpc,
 			from: id,
 			to:   commCfg.cluster.Me,
 			payload: &RequestVoteResp{

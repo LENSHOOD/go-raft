@@ -14,7 +14,7 @@ func (t *T) TestFollowerVoteWithInit(c *C) {
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &RequestVoteReq{
 			Term:        1,
 			CandidateId: 2,
@@ -27,7 +27,7 @@ func (t *T) TestFollowerVoteWithInit(c *C) {
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(1))
 	c.Assert(voteResp.VoteGranted, Equals, true)
@@ -44,7 +44,7 @@ func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &RequestVoteReq{
 			Term:        1,
 			CandidateId: 2,
@@ -58,7 +58,7 @@ func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(2))
 	c.Assert(voteResp.VoteGranted, Equals, false)
@@ -74,7 +74,7 @@ func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &RequestVoteReq{
 			Term:        1,
 			CandidateId: 2,
@@ -89,7 +89,7 @@ func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(1))
 	c.Assert(voteResp.VoteGranted, Equals, false)
@@ -105,7 +105,7 @@ func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &RequestVoteReq{
 			Term:        2,
 			CandidateId: 3,
@@ -120,7 +120,7 @@ func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(f.votedFor, Equals, Id(3))
 	c.Assert(voteResp.Term, Equals, Term(2))
@@ -137,7 +137,7 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &RequestVoteReq{
 			Term:         5,
 			CandidateId:  2,
@@ -158,7 +158,7 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermBiggerThanCandidate(c *C) {
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(5))
 	c.Assert(voteResp.VoteGranted, Equals, false)
@@ -174,7 +174,7 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &RequestVoteReq{
 			Term:         5,
 			CandidateId:  2,
@@ -191,7 +191,7 @@ func (t *T) TestFollowerNotVoteWhenLastEntryTermSameAsCandidateButIndexMore(c *C
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	voteResp := res.payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(5))
 	c.Assert(voteResp.VoteGranted, Equals, false)
@@ -207,7 +207,7 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &AppendEntriesReq{
 			Term: 1,
 		},
@@ -220,7 +220,7 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(2))
 	c.Assert(appendResp.Success, Equals, false)
@@ -236,7 +236,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &AppendEntriesReq{
 			Term:        4,
 			PrevLogTerm: 2,
@@ -255,7 +255,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, false)
@@ -271,7 +271,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  3,
@@ -291,7 +291,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, false)
@@ -307,7 +307,7 @@ func (t *T) TestFollowerAppendLogToLast(c *C) {
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  4,
@@ -328,7 +328,7 @@ func (t *T) TestFollowerAppendLogToLast(c *C) {
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
@@ -345,7 +345,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  1,
@@ -367,7 +367,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesThenUpdateCo
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
@@ -388,7 +388,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenU
 	}
 
 	req := Msg{
-		tp: Req,
+		tp: Rpc,
 		payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  1,
@@ -410,7 +410,7 @@ func (t *T) TestFollowerAppendLogToRightIdxAndRemoveTheFollowEntriesNotSameThenU
 	res := f.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Resp)
+	c.Assert(res.tp, Equals, Rpc)
 	appendResp := res.payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)

@@ -31,10 +31,21 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 				LeaderCommit: l.commitIndex,
 			})
 		}
-	case Req, Resp:
+	case Cmd:
 		switch msg.payload.(type) {
 		case *CmdReq:
 			return l.broadcastReq(l.appendLogFromCmd(msg.from, msg.payload.(*CmdReq).Cmd))
+		}
+	case Rpc:
+		recvTerm := msg.payload.(TermHolder).GetTerm()
+		if recvTerm < l.currentTerm {
+			return NullMsg
+		} else if recvTerm > l.currentTerm {
+			l.currentTerm = recvTerm
+			return l.moveState(l.toFollower(msg.from))
+		}
+
+		switch msg.payload.(type) {
 		case *AppendEntriesResp:
 			resp := msg.payload.(*AppendEntriesResp)
 			if resp.Success {
@@ -88,6 +99,18 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) *AppendEntriesReq {
 		Entries:      []Entry{newEntry},
 		LeaderCommit: l.commitIndex,
 	}
+}
+
+func (l *Leader) toFollower(newLeader Id) *Follower {
+	f := NewFollower(l.cfg)
+	f.currentTerm = l.currentTerm
+	f.log = l.log
+	f.commitIndex = l.commitIndex
+	f.lastApplied = l.lastApplied
+	f.votedFor = InvalidId
+	f.cfg.leader = newLeader
+
+	return f
 }
 
 func NewLeader(c *Candidate) *Leader {

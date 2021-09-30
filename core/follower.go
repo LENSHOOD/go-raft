@@ -16,10 +16,10 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 			return f.moveState(f.toCandidate())
 		}
 
-	case Req, Resp:
+	case Rpc:
 		f.cfg.tickCnt = 0
 
-		recvTerm := msg.payload.(Rpc).GetTerm()
+		recvTerm := msg.payload.(TermHolder).GetTerm()
 		// update term and clear vote when receive newer term
 		if recvTerm > f.currentTerm {
 			f.currentTerm = recvTerm

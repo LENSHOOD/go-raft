@@ -73,7 +73,7 @@ func (r *RaftBase) moveState(to RaftObject) Msg {
 
 func (r *RaftBase) Resp(to Id, payload interface{}) Msg {
 	return Msg{
-		tp:      Resp,
+		tp:      Rpc,
 		from:    r.cfg.cluster.Me,
 		to:      to,
 		payload: payload,
@@ -82,7 +82,7 @@ func (r *RaftBase) Resp(to Id, payload interface{}) Msg {
 
 func (r *RaftBase) pointReq(dest Id, payload interface{}) Msg {
 	return Msg{
-		tp:      Req,
+		tp:      Rpc,
 		from:    r.cfg.cluster.Me,
 		to:      dest,
 		payload: payload,

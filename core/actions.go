@@ -5,8 +5,8 @@ type MsgType int
 const (
 	Tick MsgType = iota
 	MoveState
-	Req
-	Resp
+	Rpc
+	Cmd
 	Null
 )
 
@@ -19,7 +19,7 @@ type Msg struct {
 
 var NullMsg = Msg{tp: Null}
 
-type Rpc interface {
+type TermHolder interface {
 	GetTerm() Term
 }
 
@@ -30,8 +30,8 @@ type RequestVoteReq struct {
 	LastLogTerm  Term
 }
 
-func (rpc *RequestVoteReq) GetTerm() Term {
-	return rpc.Term
+func (th *RequestVoteReq) GetTerm() Term {
+	return th.Term
 }
 
 type RequestVoteResp struct {
@@ -39,8 +39,8 @@ type RequestVoteResp struct {
 	VoteGranted bool
 }
 
-func (rpc *RequestVoteResp) GetTerm() Term {
-	return rpc.Term
+func (th *RequestVoteResp) GetTerm() Term {
+	return th.Term
 }
 
 type AppendEntriesReq struct {
@@ -52,8 +52,8 @@ type AppendEntriesReq struct {
 	LeaderCommit Index
 }
 
-func (rpc *AppendEntriesReq) GetTerm() Term {
-	return rpc.Term
+func (th *AppendEntriesReq) GetTerm() Term {
+	return th.Term
 }
 
 type AppendEntriesResp struct {
@@ -61,8 +61,8 @@ type AppendEntriesResp struct {
 	Success bool
 }
 
-func (rpc *AppendEntriesResp) GetTerm() Term {
-	return rpc.Term
+func (th *AppendEntriesResp) GetTerm() Term {
+	return th.Term
 }
 
 type CmdReq struct {
