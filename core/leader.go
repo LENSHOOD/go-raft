@@ -17,25 +17,14 @@ type Leader struct {
 func (l *Leader) TakeAction(msg Msg) Msg {
 	switch msg.tp {
 	case Tick:
-		l.heartbeatIntervalCnt++
-		if l.heartbeatIntervalCnt >= heartbeatInterval {
-			l.heartbeatIntervalCnt = 0
+		return l.sendHeartbeat()
 
-			// send heartbeat (empty append log rpc)
-			return l.broadcastReq(&AppendEntriesReq{
-				Term:         l.currentTerm,
-				LeaderId:     l.cfg.cluster.Me,
-				PrevLogIndex: InvalidIndex,
-				PrevLogTerm:  InvalidTerm,
-				Entries:      []Entry{},
-				LeaderCommit: l.commitIndex,
-			})
-		}
 	case Cmd:
 		switch msg.payload.(type) {
 		case *CmdReq:
-			return l.broadcastReq(l.appendLogFromCmd(msg.from, msg.payload.(*CmdReq).Cmd))
+			return l.appendLogFromCmd(msg.from, msg.payload.(*CmdReq).Cmd)
 		}
+
 	case Rpc:
 		recvTerm := msg.payload.(TermHolder).GetTerm()
 		if recvTerm < l.currentTerm {
@@ -47,61 +36,33 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 
 		switch msg.payload.(type) {
 		case *AppendEntriesResp:
-			resp := msg.payload.(*AppendEntriesResp)
-			if resp.Success {
-				l.matchIndex[msg.from]++
-			} else {
-				stepBackedNextIdx := l.nextIndex[msg.from] - 1
-				l.nextIndex[msg.from] = stepBackedNextIdx
-
-				firstPrevEntryIdx := -1
-				for i := len(l.log) - 1; i >= 0; i-- {
-					if l.log[i].Idx == stepBackedNextIdx - 2 {
-						firstPrevEntryIdx = i
-					}
-				}
-
-				prevIdx := InvalidIndex
-				prevTerm := InvalidTerm
-				if firstPrevEntryIdx != -1 {
-					prevIdx = l.log[firstPrevEntryIdx].Idx
-					prevTerm = l.log[firstPrevEntryIdx].Term
-				}
-
-				return l.pointReq(msg.from, &AppendEntriesReq{
-					Term:         l.currentTerm,
-					LeaderId:     l.cfg.leader,
-					PrevLogIndex: prevIdx,
-					PrevLogTerm:  prevTerm,
-					Entries:      l.log[firstPrevEntryIdx + 1 :],
-					LeaderCommit: l.commitIndex,
-				})
-			}
-
-			majorityCnt := 1
-			self := l.matchIndex[msg.from]
-			for _, v := range l.matchIndex {
-				if v >= self {
-					majorityCnt++
-				}
-			}
-
-			if majorityCnt >= l.cfg.cluster.majorityCnt() {
-				if v, ok := l.clientCtxs[self]; ok {
-					l.commitIndex = self
-					// TODO: Apply cmd to state machine, consider add a apply channel. Apply from lastApplied to commitIndex
-					l.lastApplied = l.commitIndex
-
-					delete(l.clientCtxs, self)
-					return l.pointReq(v.clientId, &CmdResp{Success: true})
-				}
-			}
+			return l.dealWithAppendLogResp(msg)
 		}
 	}
+
 	return NullMsg
 }
 
-func (l *Leader) appendLogFromCmd(from Id, cmd Command) *AppendEntriesReq {
+func (l *Leader) sendHeartbeat() Msg {
+	l.heartbeatIntervalCnt++
+	if l.heartbeatIntervalCnt < heartbeatInterval {
+		return NullMsg
+	}
+
+	l.heartbeatIntervalCnt = 0
+
+	// send heartbeat (empty append log rpc)
+	return l.broadcastReq(&AppendEntriesReq{
+		Term:         l.currentTerm,
+		LeaderId:     l.cfg.cluster.Me,
+		PrevLogIndex: InvalidIndex,
+		PrevLogTerm:  InvalidTerm,
+		Entries:      []Entry{},
+		LeaderCommit: l.commitIndex,
+	})
+}
+
+func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 	lastIndex := InvalidIndex
 	lastTerm := InvalidTerm
 	if len(l.log) >= 0 {
@@ -117,14 +78,14 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) *AppendEntriesReq {
 	l.log = append(l.log, newEntry)
 	l.clientCtxs[newEntry.Idx] = clientCtx{clientId: from}
 
-	return &AppendEntriesReq{
+	return l.broadcastReq(&AppendEntriesReq{
 		Term:         l.currentTerm,
 		LeaderId:     l.cfg.leader,
 		PrevLogIndex: lastIndex,
 		PrevLogTerm:  lastTerm,
 		Entries:      []Entry{newEntry},
 		LeaderCommit: l.commitIndex,
-	}
+	})
 }
 
 func (l *Leader) toFollower(newLeader Id) *Follower {
@@ -137,6 +98,65 @@ func (l *Leader) toFollower(newLeader Id) *Follower {
 	f.cfg.leader = newLeader
 
 	return f
+}
+
+func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
+	resp := msg.payload.(*AppendEntriesResp)
+	if !resp.Success {
+		return l.resendAppendLogWithDecreasedIdx(msg.from)
+	}
+
+	l.matchIndex[msg.from]++
+	currFollowerMatchedIdx := l.matchIndex[msg.from]
+
+	majorityCnt := 1
+	for _, v := range l.matchIndex {
+		if v >= currFollowerMatchedIdx {
+			majorityCnt++
+		}
+	}
+
+	if majorityCnt >= l.cfg.cluster.majorityCnt() {
+		// send resp only if there is a not-yet-response cmd req existed
+		if v, ok := l.clientCtxs[currFollowerMatchedIdx]; ok {
+			l.commitIndex = currFollowerMatchedIdx
+			// TODO: Apply cmd to state machine, consider add a apply channel. Apply from lastApplied to commitIndex
+			l.lastApplied = l.commitIndex
+
+			delete(l.clientCtxs, currFollowerMatchedIdx)
+			return l.pointReq(v.clientId, &CmdResp{Success: true})
+		}
+	}
+
+	return NullMsg
+}
+
+func (l *Leader) resendAppendLogWithDecreasedIdx(followerId Id) Msg {
+	stepBackedNextIdx := l.nextIndex[followerId] - 1
+	l.nextIndex[followerId] = stepBackedNextIdx
+
+	firstPrevEntryIdx := -1
+	for i := len(l.log) - 1; i >= 0; i-- {
+		if l.log[i].Idx == stepBackedNextIdx-2 {
+			firstPrevEntryIdx = i
+		}
+	}
+
+	prevIdx := InvalidIndex
+	prevTerm := InvalidTerm
+	if firstPrevEntryIdx != -1 {
+		prevIdx = l.log[firstPrevEntryIdx].Idx
+		prevTerm = l.log[firstPrevEntryIdx].Term
+	}
+
+	return l.pointReq(followerId, &AppendEntriesReq{
+		Term:         l.currentTerm,
+		LeaderId:     l.cfg.leader,
+		PrevLogIndex: prevIdx,
+		PrevLogTerm:  prevTerm,
+		Entries:      l.log[firstPrevEntryIdx+1:],
+		LeaderCommit: l.commitIndex,
+	})
 }
 
 func NewLeader(c *Candidate) *Leader {
