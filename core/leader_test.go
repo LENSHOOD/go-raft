@@ -175,3 +175,86 @@ func (t *T) TestLeaderWillBackToFollowerWhenReceiveAnyRpcWithNewTerm(c *C) {
 	}
 }
 
+func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(c *C) {
+	// given
+	l := NewFollower(commCfg).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
+
+	fid := Id(2)
+	l.nextIndex[fid] = 4
+
+	resp := Msg{
+		tp:   Rpc,
+		from: fid,
+		to:   l.cfg.leader,
+		payload: &AppendEntriesResp{
+			Term:    1,
+			Success: false,
+		},
+	}
+
+	// when
+	res := l.TakeAction(resp)
+
+	// then
+	c.Assert(res.tp, Equals, Rpc)
+	c.Assert(res.to, Equals, fid)
+	if req, ok := res.payload.(*AppendEntriesReq); ok {
+		c.Assert(req.Term, Equals, l.currentTerm)
+		// nextIndex--
+		c.Assert(l.nextIndex[fid], Equals, Index(3))
+		c.Assert(req.PrevLogTerm, Equals, Term(1))
+		c.Assert(req.PrevLogIndex, Equals, Index(1))
+		// now the entries contain more than one
+		c.Assert(req.Entries, DeepEquals, []Entry{{Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}})
+	} else {
+		c.Fail()
+		c.Logf("Should get AppendEntriesReq")
+	}
+}
+
+func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailureRespFromFollower(c *C) {
+	// given
+	l := NewFollower(commCfg).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
+
+	fid := Id(2)
+	l.nextIndex[fid] = 4
+
+	resp := Msg{
+		tp:   Rpc,
+		from: fid,
+		to:   l.cfg.leader,
+		payload: &AppendEntriesResp{
+			Term:    1,
+			Success: false,
+		},
+	}
+
+	// when
+	_ = l.TakeAction(resp)
+	_ = l.TakeAction(resp)
+	res := l.TakeAction(resp)
+
+	// then
+	c.Assert(res.tp, Equals, Rpc)
+	c.Assert(res.to, Equals, fid)
+	if req, ok := res.payload.(*AppendEntriesReq); ok {
+		c.Assert(req.Term, Equals, l.currentTerm)
+		// nextIndex--
+		c.Assert(l.nextIndex[fid], Equals, Index(1))
+		c.Assert(req.PrevLogTerm, Equals, InvalidTerm)
+		c.Assert(req.PrevLogIndex, Equals, InvalidIndex)
+		// now the entries contain more than one
+		c.Assert(req.Entries, DeepEquals, []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}})
+	} else {
+		c.Fail()
+		c.Logf("Should get AppendEntriesReq")
+	}
+}

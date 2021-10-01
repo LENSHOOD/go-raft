@@ -50,6 +50,32 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 			resp := msg.payload.(*AppendEntriesResp)
 			if resp.Success {
 				l.matchIndex[msg.from]++
+			} else {
+				stepBackedNextIdx := l.nextIndex[msg.from] - 1
+				l.nextIndex[msg.from] = stepBackedNextIdx
+
+				firstPrevEntryIdx := -1
+				for i := len(l.log) - 1; i >= 0; i-- {
+					if l.log[i].Idx == stepBackedNextIdx - 2 {
+						firstPrevEntryIdx = i
+					}
+				}
+
+				prevIdx := InvalidIndex
+				prevTerm := InvalidTerm
+				if firstPrevEntryIdx != -1 {
+					prevIdx = l.log[firstPrevEntryIdx].Idx
+					prevTerm = l.log[firstPrevEntryIdx].Term
+				}
+
+				return l.pointReq(msg.from, &AppendEntriesReq{
+					Term:         l.currentTerm,
+					LeaderId:     l.cfg.leader,
+					PrevLogIndex: prevIdx,
+					PrevLogTerm:  prevTerm,
+					Entries:      l.log[firstPrevEntryIdx + 1 :],
+					LeaderCommit: l.commitIndex,
+				})
 			}
 
 			majorityCnt := 1
@@ -134,7 +160,8 @@ func NewLeader(c *Candidate) *Leader {
 		lastLogIndex = l.log[len(l.log)-1].Idx
 	}
 	for v := range l.cfg.cluster.Others {
-		l.nextIndex[Id(v)] = lastLogIndex
+		// next idx should be the last valid id +1
+		l.nextIndex[Id(v)] = lastLogIndex + 1
 		l.matchIndex[Id(v)] = InvalidIndex
 	}
 

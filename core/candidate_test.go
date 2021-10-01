@@ -250,7 +250,7 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 	if l, ok := res.payload.(*Leader); ok {
 		lastLogIndex := cand.log[len(cand.log) - 1].Idx
 		for v := range cand.cfg.cluster.Others {
-			c.Assert(l.nextIndex[Id(v)], Equals, lastLogIndex)
+			c.Assert(l.nextIndex[Id(v)], Equals, lastLogIndex + 1)
 			c.Assert(l.matchIndex[Id(v)], Equals, InvalidIndex)
 		}
 	} else {
