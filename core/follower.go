@@ -2,8 +2,8 @@ package core
 
 type Follower struct{ RaftBase }
 
-func NewFollower(cfg Config) *Follower {
-	follower := Follower{newRaftBase(cfg)}
+func NewFollower(cfg Config, sm StateMachine) *Follower {
+	follower := Follower{newRaftBase(cfg, sm)}
 	return &follower
 }
 
@@ -113,8 +113,7 @@ func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 		f.commitIndex = req.LeaderCommit
 	}
 
-	// TODO: Apply cmd to state machine, consider add a apply channel. Apply from lastApplied to commitIndex
-	f.lastApplied = f.commitIndex
+	f.applyCmdToStateMachine()
 
 	return buildResp(true)
 }

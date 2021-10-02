@@ -31,8 +31,8 @@ type Cluster struct {
 	Others []Id
 }
 
-func (c * Cluster) majorityCnt() int {
-	return len(c.Others) / 2 + 1
+func (c *Cluster) majorityCnt() int {
+	return len(c.Others)/2 + 1
 }
 
 type Config struct {
@@ -51,9 +51,10 @@ type RaftBase struct {
 	commitIndex Index
 	lastApplied Index
 	log         []Entry
+	sm          StateMachine
 }
 
-func newRaftBase(cfg Config) RaftBase {
+func newRaftBase(cfg Config, sm StateMachine) RaftBase {
 	return RaftBase{
 		cfg:         cfg,
 		currentTerm: InvalidTerm,
@@ -61,6 +62,7 @@ func newRaftBase(cfg Config) RaftBase {
 		commitIndex: InvalidIndex,
 		lastApplied: InvalidIndex,
 		log:         make([]Entry, 0),
+		sm:          sm,
 	}
 }
 
@@ -91,4 +93,25 @@ func (r *RaftBase) pointReq(dest Id, payload interface{}) Msg {
 
 func (r *RaftBase) broadcastReq(payload interface{}) Msg {
 	return r.pointReq(All, payload)
+}
+
+func (r *RaftBase) getEntryByIdx(idx Index) *Entry {
+	for _, e := range r.log {
+		if e.Idx == idx {
+			return &e
+		}
+	}
+
+	return nil
+}
+
+func (r *RaftBase) applyCmdToStateMachine() interface{} {
+	entry := r.getEntryByIdx(r.commitIndex)
+	if entry == nil {
+		panic("cannot find entry by idx")
+	}
+
+	res := r.sm.exec(entry.Cmd)
+	r.lastApplied = r.commitIndex
+	return res
 }

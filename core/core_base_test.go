@@ -22,3 +22,9 @@ var commCfg = Config{
 	electionTimeout:    3,
 	tickCnt:            0,
 }
+
+type mockStateMachine struct {}
+func (m *mockStateMachine) exec(cmd Command) interface{}  {
+	return cmd
+}
+var mockSm = &mockStateMachine{}

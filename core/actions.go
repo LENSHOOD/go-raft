@@ -70,5 +70,6 @@ type CmdReq struct {
 }
 
 type CmdResp struct {
+	Result interface{}
 	Success bool
 }

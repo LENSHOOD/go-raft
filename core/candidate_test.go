@@ -6,7 +6,7 @@ import (
 
 func (t *T) TestCandidateCanStartElection(c *C) {
 	// given
-	f := NewFollower(commCfg)
+	f := NewFollower(commCfg, mockSm)
 	f.currentTerm = 4
 	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""},
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
@@ -41,7 +41,7 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 	voteFollowerId0 := commCfg.cluster.Others[1]
 	voteFollowerId1 := commCfg.cluster.Others[3]
 
-	cand := NewFollower(commCfg).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate()
 	cand.currentTerm = 1
 
 	buildResp := func(id Id) Msg {
@@ -71,7 +71,7 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 	// given
-	cand := NewFollower(commCfg).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate()
 
 	voteFollowerId0 := commCfg.cluster.Others[1]
 	resp := Msg{
@@ -98,7 +98,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
 	// given
-	cand := NewFollower(commCfg).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate()
 
 	newCandidate := commCfg.cluster.Others[1]
 	resp := Msg{
@@ -125,7 +125,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
 
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 	// given
-	cand := NewFollower(commCfg).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate()
 	cand.currentTerm = 3
 
 	req := Msg{
@@ -152,7 +152,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 
 func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	// given
-	cand := NewFollower(commCfg).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate()
 	cand.currentTerm = 2
 
 
@@ -191,7 +191,7 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 func (t *T) TestCandidateTriggerElectionTimeoutWithEmptyTick(c *C) {
 	// given
 	currTerm := Term(1)
-	cand := NewFollower(commCfg).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate()
 	cand.currentTerm = currTerm
 	cand.cfg.electionTimeout = 3
 	cand.cfg.tickCnt = 2
@@ -222,7 +222,7 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 	voteFollowerId0 := commCfg.cluster.Others[1]
 	voteFollowerId1 := commCfg.cluster.Others[3]
 
-	cand := NewFollower(commCfg).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate()
 	cand.currentTerm = 3
 	cand.log = append(cand.log, Entry{Term: 1, Idx: 1, Cmd: ""},
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},

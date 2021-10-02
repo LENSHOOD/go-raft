@@ -6,7 +6,7 @@ import (
 
 func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 	// given
-	l := NewFollower(commCfg).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: ""}}
 
 	heartbeatInterval = 3
@@ -30,7 +30,7 @@ func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 
 func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	// given
-	l := NewFollower(commCfg).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -71,7 +71,7 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 
 func (t *T) TestLeaderShouldIncrementMatchIndexWhenReceiveSuccessRespFromFollower(c *C) {
 	// given
-	l := NewFollower(commCfg).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -99,7 +99,7 @@ func (t *T) TestLeaderShouldIncrementMatchIndexWhenReceiveSuccessRespFromFollowe
 
 func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiveMajoritySuccesses(c *C) {
 	// given
-	l := NewFollower(commCfg).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -150,7 +150,7 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 
 func (t *T) TestLeaderWillBackToFollowerWhenReceiveAnyRpcWithNewTerm(c *C) {
 	// given
-	l := NewFollower(commCfg).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 3
 
 	req := Msg{
@@ -177,7 +177,7 @@ func (t *T) TestLeaderWillBackToFollowerWhenReceiveAnyRpcWithNewTerm(c *C) {
 
 func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(c *C) {
 	// given
-	l := NewFollower(commCfg).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -218,7 +218,7 @@ func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(
 
 func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailureRespFromFollower(c *C) {
 	// given
-	l := NewFollower(commCfg).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1

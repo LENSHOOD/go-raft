@@ -89,7 +89,7 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 }
 
 func (l *Leader) toFollower(newLeader Id) *Follower {
-	f := NewFollower(l.cfg)
+	f := NewFollower(l.cfg, l.sm)
 	f.currentTerm = l.currentTerm
 	f.log = l.log
 	f.commitIndex = l.commitIndex
@@ -120,11 +120,10 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 		// send resp only if there is a not-yet-response cmd req existed
 		if v, ok := l.clientCtxs[currFollowerMatchedIdx]; ok {
 			l.commitIndex = currFollowerMatchedIdx
-			// TODO: Apply cmd to state machine, consider add a apply channel. Apply from lastApplied to commitIndex
-			l.lastApplied = l.commitIndex
+			res := l.applyCmdToStateMachine()
 
 			delete(l.clientCtxs, currFollowerMatchedIdx)
-			return l.pointReq(v.clientId, &CmdResp{Success: true})
+			return l.pointReq(v.clientId, &CmdResp{Result: res, Success: true})
 		}
 	}
 
@@ -168,6 +167,7 @@ func NewLeader(c *Candidate) *Leader {
 			commitIndex: c.commitIndex,
 			lastApplied: c.lastApplied,
 			log:         c.log,
+			sm:          c.sm,
 		},
 		0,
 		make(map[Index]clientCtx),

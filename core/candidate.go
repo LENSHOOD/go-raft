@@ -69,7 +69,7 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 }
 
 func (c *Candidate) toFollower() *Follower {
-	f := NewFollower(c.cfg)
+	f := NewFollower(c.cfg, c.sm)
 	f.currentTerm = c.currentTerm
 	f.log = c.log
 	f.commitIndex = c.commitIndex
@@ -91,6 +91,7 @@ func NewCandidate(f *Follower) *Candidate {
 			commitIndex: f.commitIndex,
 			lastApplied: f.lastApplied,
 			log:         f.log,
+			sm:          f.sm,
 		},
 		make(map[Id]bool),
 	}
