@@ -1,5 +1,7 @@
 package core
 
+import "math/rand"
+
 type Id int64
 
 const InvalidId Id = -1
@@ -42,6 +44,17 @@ type Config struct {
 	electionTimeoutMax int64
 	electionTimeout    int64
 	tickCnt            int64
+}
+
+func InitConfig(cls Cluster, eleTimeoutMin int64, eleTimeoutMax int64) Config {
+	return Config{
+		cluster: cls,
+		leader: InvalidId,
+		electionTimeoutMin: eleTimeoutMin,
+		electionTimeoutMax: eleTimeoutMax,
+		electionTimeout: rand.Int63n(eleTimeoutMax - eleTimeoutMin) + eleTimeoutMin,
+		tickCnt: 0,
+	}
 }
 
 type RaftBase struct {
@@ -125,7 +138,7 @@ func (r *RaftBase) applyCmdToStateMachine() interface{} {
 		panic("cannot find entry by idx")
 	}
 
-	res := r.sm.exec(entry.Cmd)
+	res := r.sm.Exec(entry.Cmd)
 	r.lastApplied = r.commitIndex
 	return res
 }

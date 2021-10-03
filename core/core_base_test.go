@@ -24,7 +24,7 @@ var commCfg = Config{
 }
 
 type mockStateMachine struct {}
-func (m *mockStateMachine) exec(cmd Command) interface{}  {
+func (m *mockStateMachine) Exec(cmd Command) interface{}  {
 	return cmd
 }
 var mockSm = &mockStateMachine{}
