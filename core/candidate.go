@@ -19,18 +19,13 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			c.cfg.electionTimeout = rand.Int63n(c.cfg.electionTimeoutMax-c.cfg.electionTimeoutMin) + c.cfg.electionTimeoutMin
 
 			// send vote req
-			lastLogIndex := InvalidIndex
-			lastLogTerm := InvalidTerm
-			if lastIdx := len(c.log) - 1; lastIdx >= 0 {
-				lastLogIndex = c.log[lastIdx].Idx
-				lastLogTerm = c.log[lastIdx].Term
-			}
+			lastEntry := c.getLastEntry()
 			return c.broadcastReq(
 				&RequestVoteReq{
 					Term:         c.currentTerm,
 					CandidateId:  c.cfg.cluster.Me,
-					LastLogIndex: lastLogIndex,
-					LastLogTerm:  lastLogTerm,
+					LastLogIndex: lastEntry.Idx,
+					LastLogTerm:  lastEntry.Term,
 				})
 		}
 

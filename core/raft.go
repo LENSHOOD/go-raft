@@ -95,19 +95,33 @@ func (r *RaftBase) broadcastReq(payload interface{}) Msg {
 	return r.pointReq(All, payload)
 }
 
-func (r *RaftBase) getEntryByIdx(idx Index) *Entry {
+var InvalidEntry = Entry{
+	Term: InvalidTerm,
+	Idx: InvalidIndex,
+	Cmd: "",
+}
+
+func (r *RaftBase) getLastEntry() Entry {
+	if len(r.log) > 0 {
+		return r.log[len(r.log) - 1]
+	}
+
+	return InvalidEntry
+}
+
+func (r *RaftBase) getEntryByIdx(idx Index) Entry {
 	for _, e := range r.log {
 		if e.Idx == idx {
-			return &e
+			return e
 		}
 	}
 
-	return nil
+	return InvalidEntry
 }
 
 func (r *RaftBase) applyCmdToStateMachine() interface{} {
 	entry := r.getEntryByIdx(r.commitIndex)
-	if entry == nil {
+	if entry == InvalidEntry {
 		panic("cannot find entry by idx")
 	}
 

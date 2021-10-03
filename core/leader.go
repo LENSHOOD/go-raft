@@ -63,16 +63,11 @@ func (l *Leader) sendHeartbeat() Msg {
 }
 
 func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
-	lastIndex := InvalidIndex
-	lastTerm := InvalidTerm
-	if len(l.log) >= 0 {
-		lastIndex = l.log[len(l.log)-1].Idx
-		lastTerm = l.log[len(l.log)-1].Term
-	}
+	lastEntry := l.getLastEntry()
 
 	newEntry := Entry{
 		Term: l.currentTerm,
-		Idx:  lastIndex + 1,
+		Idx:  lastEntry.Idx + 1,
 		Cmd:  cmd,
 	}
 	l.log = append(l.log, newEntry)
@@ -81,8 +76,8 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 	return l.broadcastReq(&AppendEntriesReq{
 		Term:         l.currentTerm,
 		LeaderId:     l.cfg.leader,
-		PrevLogIndex: lastIndex,
-		PrevLogTerm:  lastTerm,
+		PrevLogIndex: lastEntry.Idx,
+		PrevLogTerm:  lastEntry.Term,
 		Entries:      []Entry{newEntry},
 		LeaderCommit: l.commitIndex,
 	})
@@ -134,18 +129,18 @@ func (l *Leader) resendAppendLogWithDecreasedIdx(followerId Id) Msg {
 	stepBackedNextIdx := l.nextIndex[followerId] - 1
 	l.nextIndex[followerId] = stepBackedNextIdx
 
-	firstPrevEntryIdx := -1
+	prevEntryIdx := -1
 	for i := len(l.log) - 1; i >= 0; i-- {
 		if l.log[i].Idx == stepBackedNextIdx-2 {
-			firstPrevEntryIdx = i
+			prevEntryIdx = i
 		}
 	}
 
 	prevIdx := InvalidIndex
 	prevTerm := InvalidTerm
-	if firstPrevEntryIdx != -1 {
-		prevIdx = l.log[firstPrevEntryIdx].Idx
-		prevTerm = l.log[firstPrevEntryIdx].Term
+	if prevEntryIdx != -1 {
+		prevIdx = l.log[prevEntryIdx].Idx
+		prevTerm = l.log[prevEntryIdx].Term
 	}
 
 	return l.pointReq(followerId, &AppendEntriesReq{
@@ -153,7 +148,7 @@ func (l *Leader) resendAppendLogWithDecreasedIdx(followerId Id) Msg {
 		LeaderId:     l.cfg.leader,
 		PrevLogIndex: prevIdx,
 		PrevLogTerm:  prevTerm,
-		Entries:      l.log[firstPrevEntryIdx+1:],
+		Entries:      l.log[prevEntryIdx+1:],
 		LeaderCommit: l.commitIndex,
 	})
 }
@@ -175,13 +170,10 @@ func NewLeader(c *Candidate) *Leader {
 		make(map[Id]Index),
 	}
 
-	lastLogIndex := InvalidIndex
-	if len(l.log) > 0 {
-		lastLogIndex = l.log[len(l.log)-1].Idx
-	}
+	lastEntry := l.getLastEntry()
 	for v := range l.cfg.cluster.Others {
 		// next idx should be the last valid id +1
-		l.nextIndex[Id(v)] = lastLogIndex + 1
+		l.nextIndex[Id(v)] = lastEntry.Idx + 1
 		l.matchIndex[Id(v)] = InvalidIndex
 	}
 
