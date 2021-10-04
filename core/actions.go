@@ -11,13 +11,13 @@ const (
 )
 
 type Msg struct {
-	tp      MsgType
-	from    Id
-	to      Id
-	payload interface{}
+	Tp   MsgType
+	From    Id
+	To      Id
+	Payload interface{}
 }
 
-var NullMsg = Msg{tp: Null}
+var NullMsg = Msg{Tp: Null}
 
 type TermHolder interface {
 	GetTerm() Term

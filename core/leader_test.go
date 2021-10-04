@@ -10,7 +10,7 @@ func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: ""}}
 
 	heartbeatInterval = 3
-	tick := Msg{tp: Tick}
+	tick := Msg{Tp: Tick}
 
 	// when
 	_ = l.TakeAction(tick)
@@ -18,9 +18,9 @@ func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 	res := l.TakeAction(tick)
 
 	// then
-	c.Assert(res.tp, Equals, Rpc)
-	c.Assert(res.to, Equals, All)
-	if req, ok := res.payload.(*AppendEntriesReq); ok {
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, All)
+	if req, ok := res.Payload.(*AppendEntriesReq); ok {
 		c.Assert(len(req.Entries), Equals, 0)
 	} else {
 		c.Fail()
@@ -37,10 +37,10 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
 
 	cmdReqMsg := Msg{
-		tp:   Cmd,
-		from: Id(999),
-		to:   l.cfg.leader,
-		payload: &CmdReq{
+		Tp:   Cmd,
+		From: Id(999),
+		To:   l.cfg.leader,
+		Payload: &CmdReq{
 			Cmd: "test",
 		},
 	}
@@ -49,11 +49,11 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	res := l.TakeAction(cmdReqMsg)
 
 	// then msg
-	c.Assert(res.tp, Equals, Rpc)
-	c.Assert(res.to, Equals, All)
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, All)
 
 	// then payload
-	if appendLogReq, ok := res.payload.(*AppendEntriesReq); ok {
+	if appendLogReq, ok := res.Payload.(*AppendEntriesReq); ok {
 		c.Assert(appendLogReq.Term, Equals, l.currentTerm)
 		c.Assert(appendLogReq.LeaderId, Equals, l.cfg.leader)
 		c.Assert(appendLogReq.PrevLogTerm, Equals, Term(1))
@@ -80,10 +80,10 @@ func (t *T) TestLeaderShouldIncrementMatchIndexWhenReceiveSuccessRespFromFollowe
 	l.matchIndex[Id(2)] = 0
 
 	resp := Msg{
-		tp:   Rpc,
-		from: Id(2),
-		to:   l.cfg.leader,
-		payload: &AppendEntriesResp{
+		Tp:   Rpc,
+		From: Id(2),
+		To:   l.cfg.leader,
+		Payload: &AppendEntriesResp{
 			Term:    1,
 			Success: true,
 		},
@@ -113,10 +113,10 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 
 	buildResp := func(id Id) Msg {
 		return Msg{
-			tp:   Rpc,
-			from: id,
-			to:   l.cfg.leader,
-			payload: &AppendEntriesResp{
+			Tp:   Rpc,
+			From: id,
+			To:   l.cfg.leader,
+			Payload: &AppendEntriesResp{
 				Term:    1,
 				Success: true,
 			},
@@ -134,9 +134,9 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 	c.Assert(l.matchIndex[Id(5)], Equals, Index(1))
 
 	c.Assert(res1, Equals, NullMsg)
-	if payload, ok := res2.payload.(*CmdResp); ok {
+	if payload, ok := res2.Payload.(*CmdResp); ok {
 		c.Assert(payload.Success, Equals, true)
-		c.Assert(res2.to, Equals, Id(999))
+		c.Assert(res2.To, Equals, Id(999))
 
 		_, exist := l.clientCtxs[Index(2)]
 		c.Assert(exist, Equals, false)
@@ -154,8 +154,8 @@ func (t *T) TestLeaderWillBackToFollowerWhenReceiveAnyRpcWithNewTerm(c *C) {
 	l.currentTerm = 3
 
 	req := Msg{
-		tp: Rpc,
-		payload: &AppendEntriesReq{
+		Tp: Rpc,
+		Payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  4,
 			PrevLogIndex: 5,
@@ -167,9 +167,9 @@ func (t *T) TestLeaderWillBackToFollowerWhenReceiveAnyRpcWithNewTerm(c *C) {
 	res := l.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, MoveState)
-	if f, ok := res.payload.(*Follower); ok {
-		c.Assert(f.currentTerm, Equals, (req.payload.(*AppendEntriesReq)).Term)
+	c.Assert(res.Tp, Equals, MoveState)
+	if f, ok := res.Payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (req.Payload.(*AppendEntriesReq)).Term)
 	} else {
 		c.Fail()
 	}
@@ -187,10 +187,10 @@ func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(
 	l.nextIndex[fid] = 4
 
 	resp := Msg{
-		tp:   Rpc,
-		from: fid,
-		to:   l.cfg.leader,
-		payload: &AppendEntriesResp{
+		Tp:   Rpc,
+		From: fid,
+		To:   l.cfg.leader,
+		Payload: &AppendEntriesResp{
 			Term:    1,
 			Success: false,
 		},
@@ -200,9 +200,9 @@ func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(
 	res := l.TakeAction(resp)
 
 	// then
-	c.Assert(res.tp, Equals, Rpc)
-	c.Assert(res.to, Equals, fid)
-	if req, ok := res.payload.(*AppendEntriesReq); ok {
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, fid)
+	if req, ok := res.Payload.(*AppendEntriesReq); ok {
 		c.Assert(req.Term, Equals, l.currentTerm)
 		// nextIndex--
 		c.Assert(l.nextIndex[fid], Equals, Index(3))
@@ -228,10 +228,10 @@ func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailu
 	l.nextIndex[fid] = 4
 
 	resp := Msg{
-		tp:   Rpc,
-		from: fid,
-		to:   l.cfg.leader,
-		payload: &AppendEntriesResp{
+		Tp:   Rpc,
+		From: fid,
+		To:   l.cfg.leader,
+		Payload: &AppendEntriesResp{
 			Term:    1,
 			Success: false,
 		},
@@ -243,9 +243,9 @@ func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailu
 	res := l.TakeAction(resp)
 
 	// then
-	c.Assert(res.tp, Equals, Rpc)
-	c.Assert(res.to, Equals, fid)
-	if req, ok := res.payload.(*AppendEntriesReq); ok {
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, fid)
+	if req, ok := res.Payload.(*AppendEntriesReq); ok {
 		c.Assert(req.Term, Equals, l.currentTerm)
 		// nextIndex--
 		c.Assert(l.nextIndex[fid], Equals, Index(1))

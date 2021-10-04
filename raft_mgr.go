@@ -3,28 +3,44 @@ package go_raft
 import (
 	"go-raft/core"
 	"hash/maphash"
+	"time"
 )
 
 type Address string
 type Rpc struct {
-	Addr Address
+	Addr    Address
 	Payload interface{}
 }
 
 type Config struct {
-	me Address
+	me                   Address
 	others               []Address
-	tickIntervalMilliSec int
+	tickIntervalMilliSec int64
 	electionTimeoutMin   int64
-	electionTimeoutMax int64
+	electionTimeoutMax   int64
 }
 
 type RaftManager struct {
-	obj core.RaftObject
-	input chan *Rpc
-	output chan *Rpc
+	obj       core.RaftObject
+	input     chan *Rpc
+	output    chan *Rpc
+	ticker    *time.Ticker
 	cfg       Config
 	addrMapId map[Address]core.Id
+}
+
+func (m *RaftManager) Run() {
+	m.ticker = time.NewTicker(time.Millisecond * time.Duration(m.cfg.tickIntervalMilliSec))
+
+	res := core.NullMsg
+	select {
+	case _ = <- m.ticker.C:
+		res = m.obj.TakeAction(core.Msg{Tp: core.Tick})
+	}
+
+	if res != core.NullMsg {
+		// TODO: deal with res
+	}
 }
 
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh chan *Rpc) *RaftManager {
@@ -37,7 +53,7 @@ func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh ch
 
 	// build cluster with id
 	cls := core.Cluster{
-		Me: genId(cfg.me),
+		Me:     genId(cfg.me),
 		Others: []core.Id{},
 	}
 	mgr.addrMapId[cfg.me] = cls.Me
@@ -55,6 +71,7 @@ func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh ch
 }
 
 var hash maphash.Hash
+
 func genId(addr Address) core.Id {
 	_, _ = hash.WriteString(string(addr))
 	return core.Id(hash.Sum64())

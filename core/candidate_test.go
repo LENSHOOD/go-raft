@@ -13,16 +13,16 @@ func (t *T) TestCandidateCanStartElection(c *C) {
 		Entry{Term: 4, Idx: 5, Cmd: ""})
 
 	cand := f.toCandidate()
-	tick := Msg{tp: Tick}
+	tick := Msg{Tp: Tick}
 
 	// when
 	res := cand.TakeAction(tick)
 
 	// then
-	c.Assert(res.tp, Equals, Rpc)
-	c.Assert(res.from, Equals, cand.cfg.cluster.Me)
-	c.Assert(res.to, Equals, All)
-	if rv, ok := res.payload.(*RequestVoteReq); !ok {
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.From, Equals, cand.cfg.cluster.Me)
+	c.Assert(res.To, Equals, All)
+	if rv, ok := res.Payload.(*RequestVoteReq); !ok {
 		c.Fail()
 	} else {
 		c.Assert(rv.Term, Equals, f.currentTerm+1)
@@ -46,10 +46,10 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 
 	buildResp := func(id Id) Msg {
 		return Msg{
-			tp:   Rpc,
-			from: id,
-			to:   commCfg.cluster.Me,
-			payload: &RequestVoteResp{
+			Tp:   Rpc,
+			From: id,
+			To:   commCfg.cluster.Me,
+			Payload: &RequestVoteResp{
 				Term:        1,
 				VoteGranted: true,
 			},
@@ -75,10 +75,10 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 
 	voteFollowerId0 := commCfg.cluster.Others[1]
 	resp := Msg{
-		tp:   Rpc,
-		from: voteFollowerId0,
-		to:   commCfg.cluster.Me,
-		payload: &RequestVoteResp{
+		Tp:   Rpc,
+		From: voteFollowerId0,
+		To:   commCfg.cluster.Me,
+		Payload: &RequestVoteResp{
 			Term:        cand.currentTerm + 1,
 			VoteGranted: false,
 		},
@@ -88,9 +88,9 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 	res := cand.TakeAction(resp)
 
 	// then
-	c.Assert(res.tp, Equals, MoveState)
-	if f, ok := res.payload.(*Follower); ok {
-		c.Assert(f.currentTerm, Equals, (resp.payload.(*RequestVoteResp)).Term)
+	c.Assert(res.Tp, Equals, MoveState)
+	if f, ok := res.Payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (resp.Payload.(*RequestVoteResp)).Term)
 	} else {
 		c.Fail()
 	}
@@ -102,10 +102,10 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
 
 	newCandidate := commCfg.cluster.Others[1]
 	resp := Msg{
-		tp:   Rpc,
-		from: newCandidate,
-		to:   commCfg.cluster.Me,
-		payload: &RequestVoteReq{
+		Tp:   Rpc,
+		From: newCandidate,
+		To:   commCfg.cluster.Me,
+		Payload: &RequestVoteReq{
 			Term:        cand.currentTerm + 1,
 			CandidateId: newCandidate,
 		},
@@ -115,9 +115,9 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
 	res := cand.TakeAction(resp)
 
 	// then
-	c.Assert(res.tp, Equals, MoveState)
-	if f, ok := res.payload.(*Follower); ok {
-		c.Assert(f.currentTerm, Equals, (resp.payload.(*RequestVoteReq)).Term)
+	c.Assert(res.Tp, Equals, MoveState)
+	if f, ok := res.Payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (resp.Payload.(*RequestVoteReq)).Term)
 	} else {
 		c.Fail()
 	}
@@ -129,8 +129,8 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 	cand.currentTerm = 3
 
 	req := Msg{
-		tp: Rpc,
-		payload: &AppendEntriesReq{
+		Tp: Rpc,
+		Payload: &AppendEntriesReq{
 			Term:         4,
 			PrevLogTerm:  4,
 			PrevLogIndex: 5,
@@ -142,9 +142,9 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 	res := cand.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, MoveState)
-	if f, ok := res.payload.(*Follower); ok {
-		c.Assert(f.currentTerm, Equals, (req.payload.(*AppendEntriesReq)).Term)
+	c.Assert(res.Tp, Equals, MoveState)
+	if f, ok := res.Payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (req.Payload.(*AppendEntriesReq)).Term)
 	} else {
 		c.Fail()
 	}
@@ -158,16 +158,16 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 
 	// when
 	msg1 := Msg{
-		tp: Rpc,
-		payload: &AppendEntriesReq{
+		Tp: Rpc,
+		Payload: &AppendEntriesReq{
 			Term:         1,
 		},
 	}
 	res1 := cand.TakeAction(msg1)
 
 	msg2 := Msg{
-		tp: Rpc,
-		payload: &RequestVoteResp{
+		Tp: Rpc,
+		Payload: &RequestVoteResp{
 			Term:        1,
 			VoteGranted: true,
 		},
@@ -175,8 +175,8 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	res2 := cand.TakeAction(msg2)
 
 	msg3 := Msg{
-		tp: Rpc,
-		payload: &RequestVoteReq{
+		Tp: Rpc,
+		Payload: &RequestVoteReq{
 			Term:        1,
 		},
 	}
@@ -196,16 +196,16 @@ func (t *T) TestCandidateTriggerElectionTimeoutWithEmptyTick(c *C) {
 	cand.cfg.electionTimeout = 3
 	cand.cfg.tickCnt = 2
 
-	req := Msg{tp: Tick}
+	req := Msg{Tp: Tick}
 
 	// when
 	res := cand.TakeAction(req)
 
 	// then
-	c.Assert(res.tp, Equals, Rpc)
-	c.Assert(res.from, Equals, cand.cfg.cluster.Me)
-	c.Assert(res.to, Equals, All)
-	if rv, ok := res.payload.(*RequestVoteReq); !ok {
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.From, Equals, cand.cfg.cluster.Me)
+	c.Assert(res.To, Equals, All)
+	if rv, ok := res.Payload.(*RequestVoteReq); !ok {
 		c.Fail()
 	} else {
 		c.Assert(rv.Term, Equals, currTerm + 1)
@@ -230,10 +230,10 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 
 	buildResp := func(id Id) Msg {
 		return Msg{
-			tp:   Rpc,
-			from: id,
-			to:   commCfg.cluster.Me,
-			payload: &RequestVoteResp{
+			Tp:   Rpc,
+			From: id,
+			To:   commCfg.cluster.Me,
+			Payload: &RequestVoteResp{
 				Term:        3,
 				VoteGranted: true,
 			},
@@ -246,8 +246,8 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 
 	// then
 	c.Assert(len(cand.voted), Equals, 3)
-	c.Assert(res.tp, Equals, MoveState)
-	if l, ok := res.payload.(*Leader); ok {
+	c.Assert(res.Tp, Equals, MoveState)
+	if l, ok := res.Payload.(*Leader); ok {
 		lastLogIndex := cand.log[len(cand.log) - 1].Idx
 		for v := range cand.cfg.cluster.Others {
 			c.Assert(l.nextIndex[Id(v)], Equals, lastLogIndex + 1)

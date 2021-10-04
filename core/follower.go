@@ -8,7 +8,7 @@ func NewFollower(cfg Config, sm StateMachine) *Follower {
 }
 
 func (f *Follower) TakeAction(msg Msg) Msg {
-	switch msg.tp {
+	switch msg.Tp {
 	case Tick:
 		f.cfg.tickCnt++
 
@@ -19,18 +19,18 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 	case Rpc:
 		f.cfg.tickCnt = 0
 
-		recvTerm := msg.payload.(TermHolder).GetTerm()
+		recvTerm := msg.Payload.(TermHolder).GetTerm()
 		// update term and clear vote when receive newer term
 		if recvTerm > f.currentTerm {
 			f.currentTerm = recvTerm
 			f.votedFor = InvalidId
 		}
 
-		switch msg.payload.(type) {
+		switch msg.Payload.(type) {
 		case *RequestVoteReq:
-			return f.Resp(msg.from, f.vote(msg.payload.(*RequestVoteReq)))
+			return f.Resp(msg.From, f.vote(msg.Payload.(*RequestVoteReq)))
 		case *AppendEntriesReq:
-			return f.Resp(msg.from, f.append(msg.payload.(*AppendEntriesReq)))
+			return f.Resp(msg.From, f.append(msg.Payload.(*AppendEntriesReq)))
 		}
 	}
 

@@ -8,7 +8,7 @@ type Candidate struct {
 }
 
 func (c *Candidate) TakeAction(msg Msg) Msg {
-	switch msg.tp {
+	switch msg.Tp {
 	case Tick:
 		c.cfg.tickCnt++
 
@@ -32,7 +32,7 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 	case Rpc:
 		c.cfg.tickCnt = 0
 
-		recvTerm := msg.payload.(TermHolder).GetTerm()
+		recvTerm := msg.Payload.(TermHolder).GetTerm()
 		if recvTerm < c.currentTerm {
 			return NullMsg
 		} else if recvTerm > c.currentTerm {
@@ -40,10 +40,10 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			return c.moveState(c.toFollower())
 		}
 
-		switch msg.payload.(type) {
+		switch msg.Payload.(type) {
 		case *RequestVoteResp:
-			resp := msg.payload.(*RequestVoteResp)
-			c.voted[msg.from] = resp.VoteGranted
+			resp := msg.Payload.(*RequestVoteResp)
+			c.voted[msg.From] = resp.VoteGranted
 
 			voteCnt := 0
 			for v := range c.cfg.cluster.Others {

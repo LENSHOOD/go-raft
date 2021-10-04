@@ -15,26 +15,26 @@ type Leader struct {
 }
 
 func (l *Leader) TakeAction(msg Msg) Msg {
-	switch msg.tp {
+	switch msg.Tp {
 	case Tick:
 		return l.sendHeartbeat()
 
 	case Cmd:
-		switch msg.payload.(type) {
+		switch msg.Payload.(type) {
 		case *CmdReq:
-			return l.appendLogFromCmd(msg.from, msg.payload.(*CmdReq).Cmd)
+			return l.appendLogFromCmd(msg.From, msg.Payload.(*CmdReq).Cmd)
 		}
 
 	case Rpc:
-		recvTerm := msg.payload.(TermHolder).GetTerm()
+		recvTerm := msg.Payload.(TermHolder).GetTerm()
 		if recvTerm < l.currentTerm {
 			return NullMsg
 		} else if recvTerm > l.currentTerm {
 			l.currentTerm = recvTerm
-			return l.moveState(l.toFollower(msg.from))
+			return l.moveState(l.toFollower(msg.From))
 		}
 
-		switch msg.payload.(type) {
+		switch msg.Payload.(type) {
 		case *AppendEntriesResp:
 			return l.dealWithAppendLogResp(msg)
 		}
@@ -96,13 +96,13 @@ func (l *Leader) toFollower(newLeader Id) *Follower {
 }
 
 func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
-	resp := msg.payload.(*AppendEntriesResp)
+	resp := msg.Payload.(*AppendEntriesResp)
 	if !resp.Success {
-		return l.resendAppendLogWithDecreasedIdx(msg.from)
+		return l.resendAppendLogWithDecreasedIdx(msg.From)
 	}
 
-	l.matchIndex[msg.from]++
-	currFollowerMatchedIdx := l.matchIndex[msg.from]
+	l.matchIndex[msg.From]++
+	currFollowerMatchedIdx := l.matchIndex[msg.From]
 
 	majorityCnt := 1
 	for _, v := range l.matchIndex {

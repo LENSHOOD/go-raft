@@ -81,26 +81,26 @@ func newRaftBase(cfg Config, sm StateMachine) RaftBase {
 
 func (r *RaftBase) moveState(to RaftObject) Msg {
 	return Msg{
-		tp:      MoveState,
-		payload: to,
+		Tp:      MoveState,
+		Payload: to,
 	}
 }
 
 func (r *RaftBase) Resp(to Id, payload interface{}) Msg {
 	return Msg{
-		tp:      Rpc,
-		from:    r.cfg.cluster.Me,
-		to:      to,
-		payload: payload,
+		Tp:      Rpc,
+		From:    r.cfg.cluster.Me,
+		To:      to,
+		Payload: payload,
 	}
 }
 
 func (r *RaftBase) pointReq(dest Id, payload interface{}) Msg {
 	return Msg{
-		tp:      Rpc,
-		from:    r.cfg.cluster.Me,
-		to:      dest,
-		payload: payload,
+		Tp:      Rpc,
+		From:    r.cfg.cluster.Me,
+		To:      dest,
+		Payload: payload,
 	}
 }
 
