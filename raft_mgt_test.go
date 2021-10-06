@@ -1,6 +1,7 @@
 package go_raft
 
 import (
+	"github.com/stretchr/testify/mock"
 	"go-raft/core"
 	. "gopkg.in/check.v1"
 	"testing"
@@ -44,22 +45,46 @@ func (t *T) TestNewRaftMgr(c *C) {
 	c.Assert(len(mgr.addrMapId), Equals, 5)
 }
 
-type fakeRaftObject struct{ msg core.Msg}
+type fakeRaftObject struct{ mock.Mock }
 func (f *fakeRaftObject) TakeAction(msg core.Msg) core.Msg {
-	f.msg = msg
-	return msg
+	ret := f.Called(msg)
+	return ret.Get(0).(core.Msg)
 }
-var fakeRaftObj =  &fakeRaftObject{ msg: core.NullMsg}
 
 func (t *T) TestTick(c *C) {
 	// given
 	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
-	mgr.obj = fakeRaftObj
+	mockObj := new(fakeRaftObject)
+	mockObj.On("TakeAction", mock.Anything).Return(core.NullMsg)
+	mgr.obj = mockObj
 
 	// when
 	mgr.Run()
 	time.Sleep(time.Millisecond * time.Duration(cfg.tickIntervalMilliSec * 2))
 
 	// then
-	c.Assert(fakeRaftObj.msg.Tp, Equals, core.Tick)
+	mockObj.AssertCalled(c, "TakeAction", core.Msg{Tp: core.Tick})
+}
+
+func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
+	// given
+	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	mockObj := new(fakeRaftObject)
+	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
+		Tp: core.MoveState,
+		Payload: &core.Follower{},
+	})
+	mgr.obj = mockObj
+
+	// when
+	rpc := &Rpc{Addr: "", Payload: core.RequestVoteReq{Term: 10}}
+	inputCh <- rpc
+	mgr.Run()
+
+	// then
+	mockObj.AssertExpectations(c)
+	_, isFollower := mgr.obj.(*core.Follower)
+	c.Assert(isFollower, Equals, true)
+	_, isExist := mgr.addrMapId[rpc.Addr]
+	c.Assert(isExist, Equals, true)
 }

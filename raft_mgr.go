@@ -36,10 +36,26 @@ func (m *RaftManager) Run() {
 	select {
 	case _ = <- m.ticker.C:
 		res = m.obj.TakeAction(core.Msg{Tp: core.Tick})
+	case req := <-m.input:
+		fromId, isExist := m.addrMapId[req.Addr]
+		if !isExist {
+			fromId = genId(req.Addr)
+			m.addrMapId[req.Addr] = fromId
+		}
+
+		res = m.obj.TakeAction(core.Msg{
+			Tp:      core.Rpc,
+			From:    fromId,
+			To:      m.addrMapId[m.cfg.me],
+			Payload: req.Payload,
+		})
 	}
 
 	if res != core.NullMsg {
-		// TODO: deal with res
+		switch res.Tp {
+		case core.MoveState:
+			m.obj = res.Payload.(core.RaftObject)
+		}
 	}
 }
 
