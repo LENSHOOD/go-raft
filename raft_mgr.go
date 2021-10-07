@@ -50,11 +50,11 @@ func (aim *addrIdMapper) remove(id core.Id) {
 }
 
 type RaftManager struct {
-	obj       core.RaftObject
-	input     chan *Rpc
-	output    chan *Rpc
-	ticker    *time.Ticker
-	cfg       Config
+	obj    core.RaftObject
+	input  chan *Rpc
+	output chan *Rpc
+	ticker *time.Ticker
+	cfg    Config
 	addrIdMapper
 }
 
@@ -66,8 +66,13 @@ func (m *RaftManager) Run() {
 	case _ = <-m.ticker.C:
 		res = m.obj.TakeAction(core.Msg{Tp: core.Tick})
 	case req := <-m.input:
+		tp := core.Rpc
+		if _, ok := req.Payload.(*core.CmdReq); ok {
+			tp = core.Cmd
+		}
+
 		res = m.obj.TakeAction(core.Msg{
-			Tp:      core.Rpc,
+			Tp:      tp,
 			From:    m.getIdByAddr(req.Addr),
 			To:      m.getIdByAddr(m.cfg.me),
 			Payload: req.Payload,
@@ -115,9 +120,9 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh chan *Rpc) *RaftManager {
 	mgr := RaftManager{
-		input:     inputCh,
-		output:    outputCh,
-		cfg:       cfg,
+		input:  inputCh,
+		output: outputCh,
+		cfg:    cfg,
 		addrIdMapper: addrIdMapper{
 			idMapAddr: make(map[core.Id]Address),
 			addrMapId: make(map[Address]core.Id),

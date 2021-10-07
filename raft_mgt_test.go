@@ -151,3 +151,22 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 		c.Assert(res.Payload.(*core.AppendEntriesResp).Term, Equals, core.Term(10))
 	}
 }
+
+func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
+	// given
+	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	mockObj := new(fakeRaftObject)
+	mockObj.On("TakeAction", mock.Anything).Return(core.NullMsg).Run(func(args mock.Arguments) {
+		msg := args[0].(core.Msg)
+		c.Assert(msg.Tp, Equals, core.Cmd)
+	})
+	mgr.obj = mockObj
+
+	// when
+	cmd := &Rpc{Addr: "addr", Payload: &core.CmdReq{}}
+	inputCh <- cmd
+	mgr.Run()
+
+	// then
+	mockObj.AssertExpectations(c)
+}
