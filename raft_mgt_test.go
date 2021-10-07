@@ -170,3 +170,30 @@ func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 	// then
 	mockObj.AssertExpectations(c)
 }
+
+func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMsg(c *C) {
+	// given
+	outputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	mockObj := new(fakeRaftObject)
+	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
+		Tp:      core.Rpc,
+		Payload: &core.CmdResp{Success: true},
+	})
+	mgr.obj = mockObj
+
+	// when
+	addr := Address("addr")
+	cmd := &Rpc{Addr: addr, Payload: &core.CmdReq{}}
+	inputCh <- cmd
+	mgr.Run()
+
+	// then
+	mockObj.AssertExpectations(c)
+	c.Assert(len(outputCh), Equals, 1)
+	res := <-outputCh
+	_, isCmdResp := res.Payload.(*core.CmdResp)
+	c.Assert(isCmdResp, Equals, true)
+	_, exist := mgr.addrIdMapper.addrMapId[addr]
+	c.Assert(exist, Equals, false)
+}

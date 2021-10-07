@@ -42,8 +42,8 @@ func (aim *addrIdMapper) getAddrById(id core.Id) (Address, bool) {
 	return addr, exist
 }
 
-func (aim *addrIdMapper) remove(id core.Id) {
-	if addr, exist := aim.idMapAddr[id]; exist {
+func (aim *addrIdMapper) remove(addr Address) {
+	if id, exist := aim.addrMapId[addr]; exist {
 		delete(aim.idMapAddr, id)
 		delete(aim.addrMapId, addr)
 	}
@@ -84,16 +84,7 @@ func (m *RaftManager) Run() {
 		case core.MoveState:
 			m.obj = res.Payload.(core.RaftObject)
 		case core.Rpc:
-			if res.To == core.All {
-				for _, addr := range m.cfg.others {
-					m.output <- &Rpc{
-						Addr:    addr,
-						Payload: res.Payload,
-					}
-				}
-			} else {
-				_ = m.sendTo(res.To, res.Payload)
-			}
+			_ = m.sendTo(res.To, res.Payload)
 		}
 	}
 }
@@ -112,6 +103,10 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 		m.output <- &Rpc{
 			Addr:    addr,
 			Payload: payload,
+		}
+
+		if _, ok := payload.(*core.CmdResp); ok {
+			m.remove(addr)
 		}
 	}
 
