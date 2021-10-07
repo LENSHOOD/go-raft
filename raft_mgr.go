@@ -1,6 +1,7 @@
 package go_raft
 
 import (
+	"fmt"
 	"go-raft/core"
 	"hash/maphash"
 	"time"
@@ -20,13 +21,41 @@ type Config struct {
 	electionTimeoutMax   int64
 }
 
+type addrIdMapper struct {
+	addrMapId map[Address]core.Id
+	idMapAddr map[core.Id]Address
+}
+
+func (aim *addrIdMapper) getIdByAddr(addr Address) core.Id {
+	if id, exist := aim.addrMapId[addr]; exist {
+		return id
+	}
+
+	id := genId(addr)
+	aim.addrMapId[addr] = id
+	aim.idMapAddr[id] = addr
+	return id
+}
+
+func (aim *addrIdMapper) getAddrById(id core.Id) (Address, bool) {
+	addr, exist := aim.idMapAddr[id]
+	return addr, exist
+}
+
+func (aim *addrIdMapper) remove(id core.Id) {
+	if addr, exist := aim.idMapAddr[id]; exist {
+		delete(aim.idMapAddr, id)
+		delete(aim.addrMapId, addr)
+	}
+}
+
 type RaftManager struct {
 	obj       core.RaftObject
 	input     chan *Rpc
 	output    chan *Rpc
 	ticker    *time.Ticker
 	cfg       Config
-	addrMapId map[Address]core.Id
+	addrIdMapper
 }
 
 func (m *RaftManager) Run() {
@@ -37,16 +66,10 @@ func (m *RaftManager) Run() {
 	case _ = <-m.ticker.C:
 		res = m.obj.TakeAction(core.Msg{Tp: core.Tick})
 	case req := <-m.input:
-		fromId, isExist := m.addrMapId[req.Addr]
-		if !isExist {
-			fromId = genId(req.Addr)
-			m.addrMapId[req.Addr] = fromId
-		}
-
 		res = m.obj.TakeAction(core.Msg{
 			Tp:      core.Rpc,
-			From:    fromId,
-			To:      m.addrMapId[m.cfg.me],
+			From:    m.getIdByAddr(req.Addr),
+			To:      m.getIdByAddr(m.cfg.me),
 			Payload: req.Payload,
 		})
 	}
@@ -64,23 +87,30 @@ func (m *RaftManager) Run() {
 					}
 				}
 			} else {
-				m.sendTo(res.To, res.Payload)
+				_ = m.sendTo(res.To, res.Payload)
 			}
 		}
 	}
 }
 
-func (m *RaftManager) sendTo(to core.Id, payload interface{}) {
-	for k, v := range m.addrMapId {
-		if v == to {
-			m.output <- &Rpc{
-				Addr:    k,
-				Payload: payload,
-			}
+func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
+	var addrs []Address
+	if to == core.All {
+		addrs = append(addrs, m.cfg.others...)
+	} else if addr, exist := m.getAddrById(to); exist {
+		addrs = append(addrs, addr)
+	} else {
+		return fmt.Errorf("dest not exist, id: %d", to)
+	}
 
-			break
+	for _, addr := range addrs {
+		m.output <- &Rpc{
+			Addr:    addr,
+			Payload: payload,
 		}
 	}
+
+	return nil
 }
 
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh chan *Rpc) *RaftManager {
@@ -88,20 +118,18 @@ func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh ch
 		input:     inputCh,
 		output:    outputCh,
 		cfg:       cfg,
-		addrMapId: make(map[Address]core.Id),
+		addrIdMapper: addrIdMapper{
+			idMapAddr: make(map[core.Id]Address),
+			addrMapId: make(map[Address]core.Id),
+		},
 	}
 
 	// build cluster with id
 	cls := core.Cluster{
-		Me:     genId(cfg.me),
-		Others: []core.Id{},
+		Me: mgr.getIdByAddr(cfg.me),
 	}
-	mgr.addrMapId[cfg.me] = cls.Me
-
-	for _, v := range cfg.others {
-		id := genId(v)
-		cls.Others = append(cls.Others, id)
-		mgr.addrMapId[v] = id
+	for _, addr := range cfg.others {
+		cls.Others = append(cls.Others, mgr.getIdByAddr(addr))
 	}
 
 	// as always, follower at beginning

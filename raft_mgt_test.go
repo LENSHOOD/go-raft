@@ -42,7 +42,8 @@ func (t *T) TestNewRaftMgr(c *C) {
 	_, isFollower := mgr.obj.(*core.Follower)
 	c.Assert(isFollower, Equals, true)
 
-	c.Assert(len(mgr.addrMapId), Equals, 5)
+	c.Assert(len(mgr.addrIdMapper.addrMapId), Equals, 5)
+	c.Assert(len(mgr.addrIdMapper.idMapAddr), Equals, 5)
 }
 
 type fakeRaftObject struct{ mock.Mock }
@@ -90,8 +91,10 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 	mockObj.AssertExpectations(c)
 	_, isFollower := mgr.obj.(*core.Follower)
 	c.Assert(isFollower, Equals, true)
-	_, isExist := mgr.addrMapId[rpc.Addr]
+	id, isExist := mgr.addrIdMapper.addrMapId[rpc.Addr]
 	c.Assert(isExist, Equals, true)
+	addr, _ := mgr.addrIdMapper.idMapAddr[id]
+	c.Assert(addr, Equals, rpc.Addr)
 }
 
 func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
@@ -142,7 +145,9 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 	c.Assert(len(outputCh), Equals, len(mgr.cfg.others))
 	for i := 0; i < len(outputCh); i++ {
 		res := <-outputCh
-		c.Assert(mgr.addrMapId[res.Addr], NotNil)
+		id, exist := mgr.addrIdMapper.addrMapId[res.Addr]
+		c.Assert(exist, Equals, true)
+		c.Assert(mgr.addrIdMapper.idMapAddr[id], Equals, res.Addr)
 		c.Assert(res.Payload.(*core.AppendEntriesResp).Term, Equals, core.Term(10))
 	}
 }
