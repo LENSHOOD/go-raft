@@ -34,7 +34,7 @@ func (m *RaftManager) Run() {
 
 	res := core.NullMsg
 	select {
-	case _ = <- m.ticker.C:
+	case _ = <-m.ticker.C:
 		res = m.obj.TakeAction(core.Msg{Tp: core.Tick})
 	case req := <-m.input:
 		fromId, isExist := m.addrMapId[req.Addr]
@@ -55,6 +55,30 @@ func (m *RaftManager) Run() {
 		switch res.Tp {
 		case core.MoveState:
 			m.obj = res.Payload.(core.RaftObject)
+		case core.Rpc:
+			if res.To == core.All {
+				for _, addr := range m.cfg.others {
+					m.output <- &Rpc{
+						Addr:    addr,
+						Payload: res.Payload,
+					}
+				}
+			} else {
+				m.sendTo(res.To, res.Payload)
+			}
+		}
+	}
+}
+
+func (m *RaftManager) sendTo(to core.Id, payload interface{}) {
+	for k, v := range m.addrMapId {
+		if v == to {
+			m.output <- &Rpc{
+				Addr:    k,
+				Payload: payload,
+			}
+
+			break
 		}
 	}
 }
