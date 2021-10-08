@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"go-raft/core"
 	"hash/maphash"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -49,6 +51,38 @@ func (aim *addrIdMapper) remove(addr Address) {
 	}
 }
 
+type switcher struct {
+	state uint64
+	wg      sync.WaitGroup
+}
+
+func (s *switcher) on() bool {
+	if atomic.LoadUint64(&s.state) != 0 {
+		return false
+	}
+
+	s.wg.Wait()
+	s.wg.Add(1)
+	atomic.StoreUint64(&s.state, 1)
+	return true
+}
+
+func (s *switcher) off() {
+	if atomic.LoadUint64(&s.state) != 0 {
+		atomic.StoreUint64(&s.state, 0)
+		s.wg.Wait()
+	}
+}
+
+func (s *switcher) isOff() bool {
+	if atomic.LoadUint64(&s.state) != 0 {
+		return false
+	}
+
+	s.wg.Done()
+	return true
+}
+
 type RaftManager struct {
 	obj    core.RaftObject
 	input  chan *Rpc
@@ -56,35 +90,42 @@ type RaftManager struct {
 	ticker *time.Ticker
 	cfg    Config
 	addrIdMapper
+	switcher switcher
 }
 
 func (m *RaftManager) Run() {
+	if !m.switcher.on() {
+		// should only run once
+		return
+	}
 	m.ticker = time.NewTicker(time.Millisecond * time.Duration(m.cfg.tickIntervalMilliSec))
 
-	res := core.NullMsg
-	select {
-	case _ = <-m.ticker.C:
-		res = m.obj.TakeAction(core.Msg{Tp: core.Tick})
-	case req := <-m.input:
-		tp := core.Rpc
-		if _, ok := req.Payload.(*core.CmdReq); ok {
-			tp = core.Cmd
+	for !m.switcher.isOff() {
+		res := core.NullMsg
+		select {
+		case _ = <-m.ticker.C:
+			res = m.obj.(core.RaftObject).TakeAction(core.Msg{Tp: core.Tick})
+		case req := <-m.input:
+			tp := core.Rpc
+			if _, ok := req.Payload.(*core.CmdReq); ok {
+				tp = core.Cmd
+			}
+
+			res = m.obj.TakeAction(core.Msg{
+				Tp:      tp,
+				From:    m.getIdByAddr(req.Addr),
+				To:      m.getIdByAddr(m.cfg.me),
+				Payload: req.Payload,
+			})
 		}
 
-		res = m.obj.TakeAction(core.Msg{
-			Tp:      tp,
-			From:    m.getIdByAddr(req.Addr),
-			To:      m.getIdByAddr(m.cfg.me),
-			Payload: req.Payload,
-		})
-	}
-
-	if res != core.NullMsg {
-		switch res.Tp {
-		case core.MoveState:
-			m.obj = res.Payload.(core.RaftObject)
-		case core.Rpc:
-			_ = m.sendTo(res.To, res.Payload)
+		if res != core.NullMsg {
+			switch res.Tp {
+			case core.MoveState:
+				m.obj = res.Payload.(core.RaftObject)
+			case core.Rpc:
+				_ = m.sendTo(res.To, res.Payload)
+			}
 		}
 	}
 }
@@ -111,6 +152,10 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 	}
 
 	return nil
+}
+
+func (m *RaftManager) Stop() {
+	m.switcher.off()
 }
 
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh chan *Rpc) *RaftManager {

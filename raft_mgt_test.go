@@ -31,11 +31,10 @@ var cfg = Config{
 	electionTimeoutMin:   10,
 	electionTimeoutMax:   50,
 }
-var inputCh = make(chan *Rpc, 10)
-var outputCh = make(chan *Rpc, 10)
 
 func (t *T) TestNewRaftMgr(c *C) {
 	// when
+	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
 	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
 
 	// then
@@ -59,14 +58,16 @@ func (f *fakeRaftObject) TakeAction(msg core.Msg) core.Msg {
 
 func (t *T) TestTick(c *C) {
 	// given
+	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
 	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.NullMsg)
 	mgr.obj = mockObj
 
 	// when
-	mgr.Run()
+	go mgr.Run()
 	time.Sleep(time.Millisecond * time.Duration(cfg.tickIntervalMilliSec*2))
+	mgr.Stop()
 
 	// then
 	mockObj.AssertCalled(c, "TakeAction", core.Msg{Tp: core.Tick})
@@ -74,6 +75,7 @@ func (t *T) TestTick(c *C) {
 
 func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 	// given
+	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
 	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
@@ -85,7 +87,10 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 	// when
 	rpc := &Rpc{Addr: "", Payload: core.RequestVoteReq{Term: 10}}
 	inputCh <- rpc
-	mgr.Run()
+	go mgr.Run()
+	for len(inputCh) != 0 {
+	}
+	mgr.Stop()
 
 	// then
 	mockObj.AssertExpectations(c)
@@ -99,7 +104,7 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 
 func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 	// given
-	outputCh := make(chan *Rpc, 10)
+	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
 	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
@@ -112,7 +117,10 @@ func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 	addr := Address("addr")
 	rpc := &Rpc{Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
 	inputCh <- rpc
-	mgr.Run()
+	go mgr.Run()
+	for len(inputCh) != 0 {
+	}
+	mgr.Stop()
 
 	// then
 	mockObj.AssertExpectations(c)
@@ -124,7 +132,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 
 func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastMsg(c *C) {
 	// given
-	outputCh := make(chan *Rpc, 10)
+	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
 	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
@@ -138,7 +146,10 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 	addr := Address("addr")
 	rpc := &Rpc{Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
 	inputCh <- rpc
-	mgr.Run()
+	go mgr.Run()
+	for len(inputCh) != 0 {
+	}
+	mgr.Stop()
 
 	// then
 	mockObj.AssertExpectations(c)
@@ -154,6 +165,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 
 func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 	// given
+	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
 	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.NullMsg).Run(func(args mock.Arguments) {
@@ -165,7 +177,10 @@ func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 	// when
 	cmd := &Rpc{Addr: "addr", Payload: &core.CmdReq{}}
 	inputCh <- cmd
-	mgr.Run()
+	go mgr.Run()
+	for len(inputCh) != 0 {
+	}
+	mgr.Stop()
 
 	// then
 	mockObj.AssertExpectations(c)
@@ -173,7 +188,7 @@ func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 
 func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMsg(c *C) {
 	// given
-	outputCh := make(chan *Rpc, 10)
+	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
 	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
@@ -186,7 +201,10 @@ func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMs
 	addr := Address("addr")
 	cmd := &Rpc{Addr: addr, Payload: &core.CmdReq{}}
 	inputCh <- cmd
-	mgr.Run()
+	go mgr.Run()
+	for len(inputCh) != 0 {
+	}
+	mgr.Stop()
 
 	// then
 	mockObj.AssertExpectations(c)
