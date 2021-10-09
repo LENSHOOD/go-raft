@@ -34,8 +34,8 @@ var cfg = Config{
 
 func (t *T) TestNewRaftMgr(c *C) {
 	// when
-	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
 
 	// then
 	_, isFollower := mgr.obj.(*core.Follower)
@@ -58,8 +58,8 @@ func (f *fakeRaftObject) TakeAction(msg core.Msg) core.Msg {
 
 func (t *T) TestTick(c *C) {
 	// given
-	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.NullMsg)
 	mgr.obj = mockObj
@@ -75,8 +75,8 @@ func (t *T) TestTick(c *C) {
 
 func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 	// given
-	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
 		Tp:      core.MoveState,
@@ -104,8 +104,8 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 
 func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 	// given
-	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
 		Tp:      core.Rpc,
@@ -115,30 +115,31 @@ func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 
 	// when
 	addr := Address("addr")
+	outputCh := mgr.Dispatcher.RegisterResp(addr)
 	rpc := &Rpc{Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
 	inputCh <- rpc
 	go mgr.Run()
 	for len(inputCh) != 0 {
 	}
-	mgr.Stop()
 
 	// then
-	mockObj.AssertExpectations(c)
-	c.Assert(len(outputCh), Equals, 1)
 	res := <-outputCh
+	mockObj.AssertExpectations(c)
 	c.Assert(res.Payload.(*core.AppendEntriesResp).Term, Equals, core.Term(10))
 	c.Assert(res.Addr, Equals, addr)
+	mgr.Stop()
 }
 
 func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastMsg(c *C) {
 	// given
 	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr.Dispatcher.RegisterReq(outputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
 		Tp:      core.Rpc,
 		To:      core.All,
-		Payload: &core.AppendEntriesResp{Term: 10},
+		Payload: &core.AppendEntriesReq{Term: 10},
 	})
 	mgr.obj = mockObj
 
@@ -159,14 +160,14 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 		id, exist := mgr.addrIdMapper.addrMapId[res.Addr]
 		c.Assert(exist, Equals, true)
 		c.Assert(mgr.addrIdMapper.idMapAddr[id], Equals, res.Addr)
-		c.Assert(res.Payload.(*core.AppendEntriesResp).Term, Equals, core.Term(10))
+		c.Assert(res.Payload.(*core.AppendEntriesReq).Term, Equals, core.Term(10))
 	}
 }
 
 func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 	// given
-	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.NullMsg).Run(func(args mock.Arguments) {
 		msg := args[0].(core.Msg)
@@ -188,8 +189,8 @@ func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 
 func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMsg(c *C) {
 	// given
-	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh, outputCh)
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
 		Tp:      core.Rpc,
@@ -199,28 +200,26 @@ func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMs
 
 	// when
 	addr := Address("addr")
+	outputCh := mgr.Dispatcher.RegisterResp(addr)
 	cmd := &Rpc{Addr: addr, Payload: &core.CmdReq{}}
 	inputCh <- cmd
 	go mgr.Run()
 	for len(inputCh) != 0 {
 	}
-	mgr.Stop()
 
 	// then
-	mockObj.AssertExpectations(c)
-	c.Assert(len(outputCh), Equals, 1)
 	res := <-outputCh
+	mockObj.AssertExpectations(c)
 	_, isCmdResp := res.Payload.(*core.CmdResp)
 	c.Assert(isCmdResp, Equals, true)
 	_, exist := mgr.addrIdMapper.addrMapId[addr]
 	c.Assert(exist, Equals, false)
+	mgr.Stop()
 }
 
 func (t *T) TestDispatcherShouldDispatchRespToRelatedChannel(c *C) {
 	// given
-	d := dispatcher{
-		respOutputs: make(map[Address]chan *Rpc),
-	}
+	d := dispatcher{respOutputs: map[Address]chan *Rpc{}}
 
 	addr1 := Address("addr1")
 	rpc1 := Rpc{Addr: addr1, Payload: &core.AppendEntriesResp{}}
@@ -231,9 +230,8 @@ func (t *T) TestDispatcherShouldDispatchRespToRelatedChannel(c *C) {
 	addr3 := Address("addr1")
 	rpc3 := Rpc{Addr: addr3, Payload: &core.CmdResp{}}
 
-
 	// when
-	assertDispatch := func (addr Address, rpc *Rpc) {
+	assertDispatch := func(addr Address, rpc *Rpc) {
 		ch := d.RegisterResp(addr)
 		go d.dispatch(rpc)
 
@@ -280,7 +278,7 @@ func (t *T) TestDispatcherShouldDispatchReqToRelatedChannel(c *C) {
 
 func (t *T) TestDispatcherShouldRemoveAllChannelWhenCallClearAll(c *C) {
 	// given
-	d := dispatcher{respOutputs: make(map[Address]chan *Rpc)}
+	d := dispatcher{respOutputs: map[Address]chan *Rpc{}}
 	reqCh := make(chan *Rpc, 3)
 	d.RegisterReq(reqCh)
 	d.RegisterResp("1")
@@ -296,4 +294,3 @@ func (t *T) TestDispatcherShouldRemoveAllChannelWhenCallClearAll(c *C) {
 
 	close(reqCh)
 }
-

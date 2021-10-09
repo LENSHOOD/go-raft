@@ -133,11 +133,11 @@ func (d *dispatcher) clearAll() {
 type RaftManager struct {
 	obj    core.RaftObject
 	input  chan *Rpc
-	output chan *Rpc
 	ticker *time.Ticker
 	cfg    Config
 	addrIdMapper
 	switcher switcher
+	Dispatcher dispatcher
 }
 
 func (m *RaftManager) Run() {
@@ -188,13 +188,14 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 	}
 
 	for _, addr := range addrs {
-		m.output <- &Rpc{
+		m.Dispatcher.dispatch(&Rpc{
 			Addr:    addr,
 			Payload: payload,
-		}
+		})
 
 		if _, ok := payload.(*core.CmdResp); ok {
 			m.remove(addr)
+			m.Dispatcher.Cancel(addr)
 		}
 	}
 
@@ -203,18 +204,18 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 
 func (m *RaftManager) Stop() {
 	m.switcher.off()
-	// TODO: close all remain dispatcher channels
+	m.Dispatcher.clearAll()
 }
 
-func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh chan *Rpc) *RaftManager {
+func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManager {
 	mgr := RaftManager{
 		input:  inputCh,
-		output: outputCh,
 		cfg:    cfg,
 		addrIdMapper: addrIdMapper{
 			idMapAddr: make(map[core.Id]Address),
 			addrMapId: make(map[Address]core.Id),
 		},
+		Dispatcher: dispatcher{respOutputs: map[Address]chan *Rpc{}},
 	}
 
 	// build cluster with id
