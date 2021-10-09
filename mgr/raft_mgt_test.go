@@ -1,8 +1,8 @@
-package go_raft
+package mgr
 
 import (
+	"github.com/LENSHOOD/go-raft/core"
 	"github.com/stretchr/testify/mock"
-	"go-raft/core"
 	. "gopkg.in/check.v1"
 	"testing"
 	"time"

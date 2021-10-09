@@ -1,8 +1,8 @@
-package go_raft
+package mgr
 
 import (
 	"fmt"
-	"go-raft/core"
+	"github.com/LENSHOOD/go-raft/core"
 	"hash/maphash"
 	"sync"
 	"sync/atomic"
@@ -53,7 +53,7 @@ func (aim *addrIdMapper) remove(addr Address) {
 
 type switcher struct {
 	state uint64
-	wg      sync.WaitGroup
+	wg    sync.WaitGroup
 }
 
 func (s *switcher) on() bool {
