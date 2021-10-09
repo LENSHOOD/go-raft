@@ -83,6 +83,53 @@ func (s *switcher) isOff() bool {
 	return true
 }
 
+type dispatcher struct {
+	reqOutput chan<- *Rpc
+	respOutputs map[Address]chan *Rpc
+}
+
+func (d *dispatcher) RegisterReq(ch chan<- *Rpc) {
+	d.reqOutput = ch
+}
+
+func (d *dispatcher) RegisterResp(addr Address) <-chan *Rpc {
+	if ch, exist := d.respOutputs[addr]; exist {
+		return ch
+	}
+
+	ch := make(chan *Rpc)
+	d.respOutputs[addr] = ch
+	return ch
+}
+
+func (d *dispatcher) Cancel(addr Address) {
+	if ch, exist := d.respOutputs[addr]; exist {
+		close(ch)
+		delete(d.respOutputs, addr)
+	}
+}
+
+func (d *dispatcher) dispatch(rpc *Rpc) {
+	switch rpc.Payload.(type) {
+	case *core.AppendEntriesReq, *core.RequestVoteReq:
+		if d.reqOutput != nil {
+			d.reqOutput <- rpc
+		}
+	case *core.AppendEntriesResp, *core.RequestVoteResp, *core.CmdResp:
+		if ch, exist := d.respOutputs[rpc.Addr]; exist {
+			ch <- rpc
+		}
+	}
+}
+
+func (d *dispatcher) clearAll() {
+	for addr := range d.respOutputs {
+		d.Cancel(addr)
+	}
+
+	d.reqOutput = nil
+}
+
 type RaftManager struct {
 	obj    core.RaftObject
 	input  chan *Rpc
@@ -156,6 +203,7 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 
 func (m *RaftManager) Stop() {
 	m.switcher.off()
+	// TODO: close all remain dispatcher channels
 }
 
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc, outputCh chan *Rpc) *RaftManager {

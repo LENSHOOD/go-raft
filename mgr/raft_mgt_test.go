@@ -215,3 +215,85 @@ func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMs
 	_, exist := mgr.addrIdMapper.addrMapId[addr]
 	c.Assert(exist, Equals, false)
 }
+
+func (t *T) TestDispatcherShouldDispatchRespToRelatedChannel(c *C) {
+	// given
+	d := dispatcher{
+		respOutputs: make(map[Address]chan *Rpc),
+	}
+
+	addr1 := Address("addr1")
+	rpc1 := Rpc{Addr: addr1, Payload: &core.AppendEntriesResp{}}
+
+	addr2 := Address("addr1")
+	rpc2 := Rpc{Addr: addr2, Payload: &core.RequestVoteResp{}}
+
+	addr3 := Address("addr1")
+	rpc3 := Rpc{Addr: addr3, Payload: &core.CmdResp{}}
+
+
+	// when
+	assertDispatch := func (addr Address, rpc *Rpc) {
+		ch := d.RegisterResp(addr)
+		go d.dispatch(rpc)
+
+		select {
+		case v := <-ch:
+			c.Assert(v, Equals, rpc)
+		}
+
+		d.Cancel(addr)
+		c.Assert(d.respOutputs[addr], IsNil)
+	}
+
+	// then
+	assertDispatch(addr1, &rpc1)
+	assertDispatch(addr2, &rpc2)
+	assertDispatch(addr3, &rpc3)
+}
+
+func (t *T) TestDispatcherShouldDispatchReqToRelatedChannel(c *C) {
+	// given
+	d := dispatcher{}
+	reqCh := make(chan *Rpc, 3)
+
+	addr := Address("addr")
+	rpc1 := Rpc{Addr: addr, Payload: &core.AppendEntriesReq{}}
+	rpc2 := Rpc{Addr: addr, Payload: &core.RequestVoteReq{}}
+
+	// when
+	d.RegisterReq(reqCh)
+	d.dispatch(&rpc1)
+	d.dispatch(&rpc2)
+
+	// then
+	arr := []*Rpc{&rpc1, &rpc2}
+	for i := 0; i < 2; i++ {
+		select {
+		case v := <-reqCh:
+			c.Assert(v, Equals, arr[i])
+		}
+	}
+
+	close(reqCh)
+}
+
+func (t *T) TestDispatcherShouldRemoveAllChannelWhenCallClearAll(c *C) {
+	// given
+	d := dispatcher{respOutputs: make(map[Address]chan *Rpc)}
+	reqCh := make(chan *Rpc, 3)
+	d.RegisterReq(reqCh)
+	d.RegisterResp("1")
+	d.RegisterResp("2")
+	d.RegisterResp("3")
+
+	// when
+	d.clearAll()
+
+	// then
+	c.Assert(d.reqOutput, IsNil)
+	c.Assert(len(d.respOutputs), Equals, 0)
+
+	close(reqCh)
+}
+
