@@ -17,43 +17,16 @@ type RaftServer struct {
 }
 
 func (s *RaftServer) RequestVote(ctx context.Context, in *RequestVoteArguments) (*RequestVoteResults, error) {
-	resp := s.serve(ctx, &core.RequestVoteReq{
-		Term:         core.Term(in.Term),
-		CandidateId:  core.Id(in.CandidateId),
-		LastLogIndex: core.Index(in.LastLogIndex),
-		LastLogTerm:  core.Term(in.LastLogTerm),
-	}).(*core.RequestVoteResp)
-
-	return &RequestVoteResults{
-		Term:        int64(resp.Term),
-		VoteGranted: resp.VoteGranted,
-	}, nil
+	resp := s.serve(ctx, MapToRequestVoteReq(in)).(*core.RequestVoteResp)
+	return MapToRequestVoteResults(resp), nil
 }
 func (s *RaftServer) AppendEntries(ctx context.Context, in *AppendEntriesArguments) (*AppendEntriesResults, error) {
-	resp := s.serve(ctx, &core.AppendEntriesReq{
-		Term:         core.Term(in.Term),
-		LeaderId:     core.Id(in.LeaderId),
-		PrevLogIndex: core.Index(in.PrevLogIndex),
-		PrevLogTerm:  core.Term(in.PrevLogTerm),
-		// Todo
-		Entries:      nil,
-		LeaderCommit: core.Index(in.LeaderCommit),
-	}).(*core.AppendEntriesResp)
-
-	return &AppendEntriesResults{
-		Term:    int64(resp.Term),
-		Success: resp.Success,
-	}, nil
+	resp := s.serve(ctx, MapToAppendEntriesReq(in)).(*core.AppendEntriesResp)
+	return MapToAppendEntriesResults(resp), nil
 }
 func (s *RaftServer) ExecCmd(ctx context.Context, in *CmdRequest) (*CmdResponse, error) {
-	resp := s.serve(ctx, &core.CmdReq{
-		Cmd: core.Command(in.Cmd),
-	}).(*core.CmdResp)
-
-	return &CmdResponse{
-		Result:  resp.Result.(string),
-		Success: resp.Success,
-	}, nil
+	resp := s.serve(ctx, MapToCmdReq(in)).(*core.CmdResp)
+	return MapToCmdResponse(resp), nil
 }
 
 func (s *RaftServer) serve(ctx context.Context, inPayload interface{}) (outPayload interface{}) {
@@ -101,54 +74,29 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 	}
 	defer conn.Close()
 
-	var resultRpc *mgr.Rpc
+	var resPayload interface{}
 	switch rpc.Payload.(type) {
 	case *core.RequestVoteReq:
-		req := rpc.Payload.(*core.RequestVoteReq)
-		resp, err := c.client.RequestVote(context.Background(), &RequestVoteArguments{
-			Term:         int64(req.Term),
-			CandidateId:  int64(req.CandidateId),
-			LastLogIndex: int64(req.LastLogIndex),
-			LastLogTerm:  int64(req.LastLogTerm),
-		})
-
+		resp, err := c.client.RequestVote(context.Background(), MapToRequestVoteArguments(rpc.Payload.(*core.RequestVoteReq)))
 		if err != nil {
 			log.Fatalf("RequestVote error: %v", err)
 		}
 
-		resultRpc = &mgr.Rpc{
-			Addr: rpc.Addr,
-			Payload: &core.RequestVoteResp{
-				Term:        core.Term(resp.Term),
-				VoteGranted: resp.VoteGranted,
-			},
-		}
-	case *core.AppendEntriesReq:
-		req := rpc.Payload.(*core.AppendEntriesReq)
-		resp, err := c.client.AppendEntries(context.Background(), &AppendEntriesArguments{
-			Term:         int64(req.Term),
-			LeaderId:     int64(req.LeaderId),
-			PrevLogIndex: int64(req.PrevLogIndex),
-			PrevLogTerm:  int64(req.PrevLogTerm),
-			// TODO
-			Entries:      nil,
-			LeaderCommit: int64(req.LeaderCommit),
-		})
+		resPayload = MapToRequestVoteResp(resp)
 
+	case *core.AppendEntriesReq:
+		resp, err := c.client.AppendEntries(context.Background(), MapToAppendEntriesArguments(rpc.Payload.(*core.AppendEntriesReq)))
 		if err != nil {
 			log.Fatalf("AppendEntries error: %v", err)
 		}
 
-		resultRpc = &mgr.Rpc{
-			Addr: rpc.Addr,
-			Payload: &core.AppendEntriesResp{
-				Term:    core.Term(resp.Term),
-				Success: resp.Success,
-			},
-		}
+		resPayload = MapToAppendEntriesResp(resp)
 	}
 
-	if resultRpc != nil {
-		c.outputCh <- resultRpc
+	if resPayload != nil {
+		c.outputCh <- &mgr.Rpc{
+			Addr:    rpc.Addr,
+			Payload: resPayload,
+		}
 	}
 }

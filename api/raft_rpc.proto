@@ -24,7 +24,7 @@ message RequestVoteResults {
 
 message Entry {
   int64 term = 1;
-  int64 id = 2;
+  int64 idx = 2;
   string cmd = 3;
 }
 
