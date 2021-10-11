@@ -27,30 +27,31 @@ type Config struct {
 }
 
 type addrIdMapper struct {
-	addrMapId map[Address]core.Id
-	idMapAddr map[core.Id]Address
+	addrMapId sync.Map
+	idMapAddr sync.Map
 }
 
 func (aim *addrIdMapper) getIdByAddr(addr Address) core.Id {
-	if id, exist := aim.addrMapId[addr]; exist {
-		return id
+	id, loaded := aim.addrMapId.LoadOrStore(addr, genId(addr))
+	if !loaded {
+		aim.idMapAddr.Store(id, addr)
 	}
 
-	id := genId(addr)
-	aim.addrMapId[addr] = id
-	aim.idMapAddr[id] = addr
-	return id
+	return id.(core.Id)
 }
 
 func (aim *addrIdMapper) getAddrById(id core.Id) (Address, bool) {
-	addr, exist := aim.idMapAddr[id]
-	return addr, exist
+	if addr, ok := aim.idMapAddr.Load(id); ok {
+		return addr.(Address), ok
+	}
+
+	return *new(Address), false
 }
 
 func (aim *addrIdMapper) remove(addr Address) {
-	if id, exist := aim.addrMapId[addr]; exist {
-		delete(aim.idMapAddr, id)
-		delete(aim.addrMapId, addr)
+	id, loaded := aim.addrMapId.LoadAndDelete(addr)
+	if loaded {
+		aim.idMapAddr.Delete(id)
 	}
 }
 
@@ -87,8 +88,8 @@ func (s *switcher) isOff() bool {
 }
 
 type dispatcher struct {
-	reqOutput chan<- *Rpc
-	respOutputs map[Address]chan *Rpc
+	reqOutput   chan<- *Rpc
+	respOutputs sync.Map
 }
 
 func (d *dispatcher) RegisterReq(ch chan<- *Rpc) {
@@ -96,19 +97,18 @@ func (d *dispatcher) RegisterReq(ch chan<- *Rpc) {
 }
 
 func (d *dispatcher) RegisterResp(addr Address) <-chan *Rpc {
-	if ch, exist := d.respOutputs[addr]; exist {
-		return ch
-	}
-
 	ch := make(chan *Rpc)
-	d.respOutputs[addr] = ch
-	return ch
+	ret, loaded := d.respOutputs.LoadOrStore(addr, ch)
+	if loaded {
+		close(ch)
+	}
+	return ret.(chan *Rpc)
 }
 
 func (d *dispatcher) Cancel(addr Address) {
-	if ch, exist := d.respOutputs[addr]; exist {
-		close(ch)
-		delete(d.respOutputs, addr)
+	ch, loaded := d.respOutputs.LoadAndDelete(addr)
+	if loaded {
+		close(ch.(chan *Rpc))
 	}
 }
 
@@ -121,8 +121,8 @@ func (d *dispatcher) dispatch(rpc *Rpc) {
 			logger.Fatalf("[MGR] request channel haven't registered yet, dispatch failed...")
 		}
 	case *core.AppendEntriesResp, *core.RequestVoteResp, *core.CmdResp:
-		if ch, exist := d.respOutputs[rpc.Addr]; exist {
-			ch <- rpc
+		if ch, exist := d.respOutputs.Load(rpc.Addr); exist {
+			ch.(chan *Rpc) <- rpc
 		} else {
 			logger.Fatalf("[MGR] response channel not found: %s, dispatch failed...", rpc.Addr)
 		}
@@ -130,10 +130,12 @@ func (d *dispatcher) dispatch(rpc *Rpc) {
 }
 
 func (d *dispatcher) clearAll() {
-	for addr := range d.respOutputs {
-		d.Cancel(addr)
-	}
+	d.respOutputs.Range(func(_, v interface{}) bool {
+		close(v.(chan *Rpc))
+		return true
+	})
 
+	d.respOutputs = sync.Map{}
 	d.reqOutput = nil
 }
 
@@ -224,11 +226,6 @@ func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManage
 	mgr := RaftManager{
 		input:  inputCh,
 		cfg:    cfg,
-		addrIdMapper: addrIdMapper{
-			idMapAddr: make(map[core.Id]Address),
-			addrMapId: make(map[Address]core.Id),
-		},
-		Dispatcher: dispatcher{respOutputs: map[Address]chan *Rpc{}},
 	}
 
 	// build cluster with id

@@ -41,8 +41,19 @@ func (t *T) TestNewRaftMgr(c *C) {
 	_, isFollower := mgr.obj.(*core.Follower)
 	c.Assert(isFollower, Equals, true)
 
-	c.Assert(len(mgr.addrIdMapper.addrMapId), Equals, 5)
-	c.Assert(len(mgr.addrIdMapper.idMapAddr), Equals, 5)
+	count := 0
+	mgr.addrIdMapper.addrMapId.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	c.Assert(count, Equals, 5)
+
+	count = 0
+	mgr.addrIdMapper.idMapAddr.Range(func(_, _ interface{}) bool {
+		count++
+		return true
+	})
+	c.Assert(count, Equals, 5)
 }
 
 type fakeRaftObject struct{ mock.Mock }
@@ -96,9 +107,9 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 	mockObj.AssertExpectations(c)
 	_, isFollower := mgr.obj.(*core.Follower)
 	c.Assert(isFollower, Equals, true)
-	id, isExist := mgr.addrIdMapper.addrMapId[rpc.Addr]
+	id, isExist := mgr.addrIdMapper.addrMapId.Load(rpc.Addr)
 	c.Assert(isExist, Equals, true)
-	addr, _ := mgr.addrIdMapper.idMapAddr[id]
+	addr, _ := mgr.addrIdMapper.idMapAddr.Load(id)
 	c.Assert(addr, Equals, rpc.Addr)
 }
 
@@ -157,9 +168,10 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 	c.Assert(len(outputCh), Equals, len(mgr.cfg.Others))
 	for i := 0; i < len(outputCh); i++ {
 		res := <-outputCh
-		id, exist := mgr.addrIdMapper.addrMapId[res.Addr]
+		id, exist := mgr.addrIdMapper.addrMapId.Load(res.Addr)
 		c.Assert(exist, Equals, true)
-		c.Assert(mgr.addrIdMapper.idMapAddr[id], Equals, res.Addr)
+		currAddr, _ := mgr.addrIdMapper.idMapAddr.Load(id)
+		c.Assert(currAddr, Equals, res.Addr)
 		c.Assert(res.Payload.(*core.AppendEntriesReq).Term, Equals, core.Term(10))
 	}
 }
@@ -212,14 +224,14 @@ func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMs
 	mockObj.AssertExpectations(c)
 	_, isCmdResp := res.Payload.(*core.CmdResp)
 	c.Assert(isCmdResp, Equals, true)
-	_, exist := mgr.addrIdMapper.addrMapId[addr]
+	_, exist := mgr.addrIdMapper.addrMapId.Load(addr)
 	c.Assert(exist, Equals, false)
 	mgr.Stop()
 }
 
 func (t *T) TestDispatcherShouldDispatchRespToRelatedChannel(c *C) {
 	// given
-	d := dispatcher{respOutputs: map[Address]chan *Rpc{}}
+	d := dispatcher{}
 
 	addr1 := Address("addr1")
 	rpc1 := Rpc{Addr: addr1, Payload: &core.AppendEntriesResp{}}
@@ -241,7 +253,8 @@ func (t *T) TestDispatcherShouldDispatchRespToRelatedChannel(c *C) {
 		}
 
 		d.Cancel(addr)
-		c.Assert(d.respOutputs[addr], IsNil)
+		_, exist := d.respOutputs.Load(addr)
+		c.Assert(exist, Equals, false)
 	}
 
 	// then
@@ -278,7 +291,7 @@ func (t *T) TestDispatcherShouldDispatchReqToRelatedChannel(c *C) {
 
 func (t *T) TestDispatcherShouldRemoveAllChannelWhenCallClearAll(c *C) {
 	// given
-	d := dispatcher{respOutputs: map[Address]chan *Rpc{}}
+	d := dispatcher{}
 	reqCh := make(chan *Rpc, 3)
 	d.RegisterReq(reqCh)
 	d.RegisterResp("1")
@@ -290,7 +303,12 @@ func (t *T) TestDispatcherShouldRemoveAllChannelWhenCallClearAll(c *C) {
 
 	// then
 	c.Assert(d.reqOutput, IsNil)
-	c.Assert(len(d.respOutputs), Equals, 0)
+	_, exist := d.respOutputs.Load("1")
+	c.Assert(exist, Equals, false)
+	_, exist = d.respOutputs.Load("2")
+	c.Assert(exist, Equals, false)
+	_, exist = d.respOutputs.Load("3")
+	c.Assert(exist, Equals, false)
 
 	close(reqCh)
 }
