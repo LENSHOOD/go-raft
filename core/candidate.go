@@ -1,6 +1,8 @@
 package core
 
-import "math/rand"
+import (
+	"math/rand"
+)
 
 type Candidate struct {
 	RaftBase
@@ -17,6 +19,7 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 
 			// reset timeout
 			c.cfg.electionTimeout = rand.Int63n(c.cfg.electionTimeoutMax-c.cfg.electionTimeoutMin) + c.cfg.electionTimeoutMin
+			c.cfg.tickCnt = 0
 
 			// send vote req
 			lastEntry := c.getLastEntry()
@@ -46,8 +49,8 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			c.voted[msg.From] = resp.VoteGranted
 
 			voteCnt := 0
-			for v := range c.cfg.cluster.Others {
-				if c.voted[Id(v)] {
+			for _, v := range c.cfg.cluster.Others {
+				if c.voted[v] {
 					voteCnt++
 				}
 			}

@@ -249,9 +249,9 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 	c.Assert(res.Tp, Equals, MoveState)
 	if l, ok := res.Payload.(*Leader); ok {
 		lastLogIndex := cand.log[len(cand.log) - 1].Idx
-		for v := range cand.cfg.cluster.Others {
-			c.Assert(l.nextIndex[Id(v)], Equals, lastLogIndex + 1)
-			c.Assert(l.matchIndex[Id(v)], Equals, InvalidIndex)
+		for _, v := range cand.cfg.cluster.Others {
+			c.Assert(l.nextIndex[v], Equals, lastLogIndex + 1)
+			c.Assert(l.matchIndex[v], Equals, InvalidIndex)
 		}
 	} else {
 		c.Fail()

@@ -171,10 +171,10 @@ func NewLeader(c *Candidate) *Leader {
 	}
 
 	lastEntry := l.getLastEntry()
-	for v := range l.cfg.cluster.Others {
+	for _, v := range l.cfg.cluster.Others {
 		// next idx should be the last valid id +1
-		l.nextIndex[Id(v)] = lastEntry.Idx + 1
-		l.matchIndex[Id(v)] = InvalidIndex
+		l.nextIndex[v] = lastEntry.Idx + 1
+		l.matchIndex[v] = InvalidIndex
 	}
 
 	l.cfg.leader = l.cfg.cluster.Me
