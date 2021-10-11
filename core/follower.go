@@ -93,6 +93,9 @@ func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 	matched, logPos := matchPrev(f.log, req.PrevLogTerm, req.PrevLogIndex)
 	if !matched {
 		return buildResp(false)
+	} else if logPos == -1 {
+		// heartbeat msg
+		return buildResp(true)
 	}
 
 	replicateBeginPos := 0
