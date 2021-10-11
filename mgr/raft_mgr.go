@@ -3,11 +3,14 @@ package mgr
 import (
 	"fmt"
 	"github.com/LENSHOOD/go-raft/core"
-	"hash/maphash"
+	"hash/fnv"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+var logger = log.Default()
 
 type Address string
 type Rpc struct {
@@ -16,11 +19,11 @@ type Rpc struct {
 }
 
 type Config struct {
-	me                   Address
-	others               []Address
-	tickIntervalMilliSec int64
-	electionTimeoutMin   int64
-	electionTimeoutMax   int64
+	Me                   Address
+	Others               []Address
+	TickIntervalMilliSec int64
+	ElectionTimeoutMin int64
+	ElectionTimeoutMax int64
 }
 
 type addrIdMapper struct {
@@ -114,10 +117,14 @@ func (d *dispatcher) dispatch(rpc *Rpc) {
 	case *core.AppendEntriesReq, *core.RequestVoteReq:
 		if d.reqOutput != nil {
 			d.reqOutput <- rpc
+		} else {
+			logger.Fatalf("[MGR] request channel haven't registered yet, dispatch failed...")
 		}
 	case *core.AppendEntriesResp, *core.RequestVoteResp, *core.CmdResp:
 		if ch, exist := d.respOutputs[rpc.Addr]; exist {
 			ch <- rpc
+		} else {
+			logger.Fatalf("[MGR] response channel not found: %s, dispatch failed...", rpc.Addr)
 		}
 	}
 }
@@ -145,7 +152,9 @@ func (m *RaftManager) Run() {
 		// should only run once
 		return
 	}
-	m.ticker = time.NewTicker(time.Millisecond * time.Duration(m.cfg.tickIntervalMilliSec))
+
+	logger.Printf("[MGR] Raft Manager Started.")
+	m.ticker = time.NewTicker(time.Millisecond * time.Duration(m.cfg.TickIntervalMilliSec))
 
 	for !m.switcher.isOff() {
 		res := core.NullMsg
@@ -153,6 +162,7 @@ func (m *RaftManager) Run() {
 		case _ = <-m.ticker.C:
 			res = m.obj.(core.RaftObject).TakeAction(core.Msg{Tp: core.Tick})
 		case req := <-m.input:
+			logger.Printf("[MGR] Received from %s: %s", req.Addr, req.Payload)
 			tp := core.Rpc
 			if _, ok := req.Payload.(*core.CmdReq); ok {
 				tp = core.Cmd
@@ -161,7 +171,7 @@ func (m *RaftManager) Run() {
 			res = m.obj.TakeAction(core.Msg{
 				Tp:      tp,
 				From:    m.getIdByAddr(req.Addr),
-				To:      m.getIdByAddr(m.cfg.me),
+				To:      m.getIdByAddr(m.cfg.Me),
 				Payload: req.Payload,
 			})
 		}
@@ -170,6 +180,7 @@ func (m *RaftManager) Run() {
 			switch res.Tp {
 			case core.MoveState:
 				m.obj = res.Payload.(core.RaftObject)
+				logger.Printf("[MGR] Role Changed: %T", res.Payload)
 			case core.Rpc:
 				_ = m.sendTo(res.To, res.Payload)
 			}
@@ -180,7 +191,7 @@ func (m *RaftManager) Run() {
 func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 	var addrs []Address
 	if to == core.All {
-		addrs = append(addrs, m.cfg.others...)
+		addrs = append(addrs, m.cfg.Others...)
 	} else if addr, exist := m.getAddrById(to); exist {
 		addrs = append(addrs, addr)
 	} else {
@@ -197,6 +208,8 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 			m.remove(addr)
 			m.Dispatcher.Cancel(addr)
 		}
+
+		logger.Printf("[MGR] Sent: [%s], msg: %s", addr, payload)
 	}
 
 	return nil
@@ -220,21 +233,20 @@ func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManage
 
 	// build cluster with id
 	cls := core.Cluster{
-		Me: mgr.getIdByAddr(cfg.me),
+		Me: mgr.getIdByAddr(cfg.Me),
 	}
-	for _, addr := range cfg.others {
+	for _, addr := range cfg.Others {
 		cls.Others = append(cls.Others, mgr.getIdByAddr(addr))
 	}
 
 	// as always, follower at beginning
-	mgr.obj = core.NewFollower(core.InitConfig(cls, cfg.electionTimeoutMin, cfg.electionTimeoutMax), sm)
+	mgr.obj = core.NewFollower(core.InitConfig(cls, cfg.ElectionTimeoutMin, cfg.ElectionTimeoutMax), sm)
 
 	return &mgr
 }
 
-var hash maphash.Hash
-
+var hash = fnv.New64()
 func genId(addr Address) core.Id {
-	_, _ = hash.WriteString(string(addr))
+	_, _ = hash.Write([]byte(addr))
 	return core.Id(hash.Sum64())
 }

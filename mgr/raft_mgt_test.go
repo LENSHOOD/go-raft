@@ -25,11 +25,11 @@ func (m *mockStateMachine) Exec(cmd core.Command) interface{} {
 var mockSm = &mockStateMachine{}
 
 var cfg = Config{
-	me:                   ":32104",
-	others:               []Address{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
-	tickIntervalMilliSec: 30,
-	electionTimeoutMin:   10,
-	electionTimeoutMax:   50,
+	Me:                   ":32104",
+	Others:               []Address{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
+	TickIntervalMilliSec: 30,
+	ElectionTimeoutMin:   10,
+	ElectionTimeoutMax:   50,
 }
 
 func (t *T) TestNewRaftMgr(c *C) {
@@ -66,7 +66,7 @@ func (t *T) TestTick(c *C) {
 
 	// when
 	go mgr.Run()
-	time.Sleep(time.Millisecond * time.Duration(cfg.tickIntervalMilliSec*2))
+	time.Sleep(time.Millisecond * time.Duration(cfg.TickIntervalMilliSec*2))
 	mgr.Stop()
 
 	// then
@@ -154,7 +154,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 
 	// then
 	mockObj.AssertExpectations(c)
-	c.Assert(len(outputCh), Equals, len(mgr.cfg.others))
+	c.Assert(len(outputCh), Equals, len(mgr.cfg.Others))
 	for i := 0; i < len(outputCh); i++ {
 		res := <-outputCh
 		id, exist := mgr.addrIdMapper.addrMapId[res.Addr]
