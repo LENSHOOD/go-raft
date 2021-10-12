@@ -87,15 +87,22 @@ func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 	}
 
 	if req.Term < f.currentTerm {
+		if f.commitIndex < req.LeaderCommit {
+			f.commitIndex = req.LeaderCommit
+		}
+
 		return buildResp(false)
+	}
+
+	// ignore heartbeat
+	if len(req.Entries) == 0 {
+		f.tryApplyCmd(req.LeaderCommit)
+		return buildResp(true)
 	}
 
 	matched, logPos := matchPrev(f.log, req.PrevLogTerm, req.PrevLogIndex)
 	if !matched {
 		return buildResp(false)
-	} else if logPos == -1 {
-		// heartbeat msg
-		return buildResp(true)
 	}
 
 	replicateBeginPos := 0
@@ -109,20 +116,13 @@ func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 	}
 
 	f.log = append(f.log[:logPos+1], req.Entries[replicateBeginPos:]...)
-	lastEntryIndex := f.log[len(f.log)-1].Idx
-	if lastEntryIndex < req.LeaderCommit {
-		f.commitIndex = lastEntryIndex
-	} else {
-		f.commitIndex = req.LeaderCommit
-	}
-
-	f.applyCmdToStateMachine()
-
+	f.tryApplyCmd(req.LeaderCommit)
 	return buildResp(true)
 }
 
 func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
-	if len(log) == 0 {
+	// first entry
+	if term == InvalidTerm && idx == InvalidIndex {
 		return true, -1
 	}
 
@@ -138,6 +138,25 @@ func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 	}
 
 	return false, -1
+}
+
+func (f *Follower) tryApplyCmd(leaderCommitIdx Index) {
+	lastEntry := f.getLastEntry()
+	if lastEntry == InvalidEntry {
+		return
+	}
+
+	if lastEntry.Idx < leaderCommitIdx {
+		f.commitIndex = lastEntry.Idx
+	} else {
+		f.commitIndex = leaderCommitIdx
+	}
+
+	if f.commitIndex == InvalidIndex || f.lastApplied == f.commitIndex {
+		return
+	}
+
+	f.applyCmdToStateMachine()
 }
 
 func (f *Follower) toCandidate() *Candidate {
