@@ -163,6 +163,7 @@ func (m *RaftManager) Run() {
 		case _ = <-m.ticker.C:
 			res = m.obj.(core.RaftObject).TakeAction(core.Msg{Tp: core.Tick})
 		case req := <-m.input:
+			logger.Printf("[MGR] Received from %s: %s", req.Addr, req.Payload)
 			tp := core.Rpc
 			if _, ok := req.Payload.(*core.CmdReq); ok {
 				tp = core.Cmd
@@ -209,6 +210,8 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 			m.remove(rpc.Addr)
 			m.Dispatcher.Cancel(rpc.Addr)
 		}
+
+		logger.Printf("[MGR] Sent: [%s], msg: %s", rpc.Addr, payload)
 	}
 
 	switch to {

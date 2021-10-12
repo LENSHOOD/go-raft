@@ -10,5 +10,5 @@ var logger = log.Default()
 type LogPrintStateMachine struct {}
 func (l *LogPrintStateMachine) Exec(cmd core.Command) interface{} {
 	logger.Printf("Command Received: %s", cmd)
-	return nil
+	return "Received: " + string(cmd)
 }
