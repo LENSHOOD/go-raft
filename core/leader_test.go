@@ -9,7 +9,7 @@ func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: ""}}
 
-	heartbeatInterval = 3
+	heartbeatDivideFactor = 3
 	tick := Msg{Tp: Tick}
 
 	// when
@@ -21,6 +21,9 @@ func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 	c.Assert(res.Tp, Equals, Rpc)
 	c.Assert(res.To, Equals, All)
 	if req, ok := res.Payload.(*AppendEntriesReq); ok {
+		lastEntry := l.getLastEntry()
+		c.Assert(req.PrevLogIndex, Equals, lastEntry.Idx)
+		c.Assert(req.PrevLogTerm, Equals, lastEntry.Term)
 		c.Assert(len(req.Entries), Equals, 0)
 	} else {
 		c.Fail()
@@ -69,7 +72,7 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	c.Assert(l.clientCtxs[Index(3)].clientId, Equals, Id(999))
 }
 
-func (t *T) TestLeaderShouldIncrementMatchIndexWhenReceiveSuccessRespFromFollower(c *C) {
+func (t *T) TestLeaderShouldIncrementMatchIndexToLastIdxWhenReceiveSuccessRespFromFollower(c *C) {
 	// given
 	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
@@ -77,11 +80,12 @@ func (t *T) TestLeaderShouldIncrementMatchIndexWhenReceiveSuccessRespFromFollowe
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
 
-	l.matchIndex[Id(2)] = 0
+	l.matchIndex[commCfg.cluster.Others[1]] = 0
+	l.nextIndex[commCfg.cluster.Others[1]] = 1
 
 	resp := Msg{
 		Tp:   Rpc,
-		From: Id(2),
+		From: commCfg.cluster.Others[1],
 		To:   l.cfg.leader,
 		Payload: &AppendEntriesResp{
 			Term:    1,
@@ -89,12 +93,19 @@ func (t *T) TestLeaderShouldIncrementMatchIndexWhenReceiveSuccessRespFromFollowe
 		},
 	}
 
-	// when recv two success resp
-	_ = l.TakeAction(resp)
+	// when
 	_ = l.TakeAction(resp)
 
 	// then
-	c.Assert(l.matchIndex[Id(2)], Equals, Index(2))
+	c.Assert(l.matchIndex[commCfg.cluster.Others[1]], Equals, Index(3))
+	c.Assert(l.nextIndex[commCfg.cluster.Others[1]], Equals, Index(4))
+
+	// when after that, matchIndex and nextIndex stayed
+	_ = l.TakeAction(resp)
+
+	// then
+	c.Assert(l.matchIndex[commCfg.cluster.Others[1]], Equals, Index(3))
+	c.Assert(l.nextIndex[commCfg.cluster.Others[1]], Equals, Index(4))
 }
 
 func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiveMajoritySuccesses(c *C) {
@@ -105,11 +116,16 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
 
-	l.matchIndex[Id(2)] = 1
-	l.matchIndex[Id(3)] = 1
-	l.matchIndex[Id(4)] = 0
-	l.matchIndex[Id(5)] = 1
+	l.matchIndex[commCfg.cluster.Others[0]] = 1
+	l.nextIndex[commCfg.cluster.Others[0]] = 2
+	l.matchIndex[commCfg.cluster.Others[1]] = 1
+	l.nextIndex[commCfg.cluster.Others[1]] = 2
+	l.matchIndex[commCfg.cluster.Others[2]] = 0
+	l.nextIndex[commCfg.cluster.Others[2]] = 1
+	l.matchIndex[commCfg.cluster.Others[3]] = 1
+	l.nextIndex[commCfg.cluster.Others[3]] = 2
 	l.clientCtxs[Index(2)] = clientCtx{clientId: Id(999)}
+	l.clientCtxs[Index(3)] = clientCtx{clientId: Id(999)}
 
 	buildResp := func(id Id) Msg {
 		return Msg{
@@ -124,27 +140,40 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 	}
 
 	// when
-	res1 := l.TakeAction(buildResp(2))
-	res2 := l.TakeAction(buildResp(3))
+	res1 := l.TakeAction(buildResp(commCfg.cluster.Others[0]))
+	res2 := l.TakeAction(buildResp(commCfg.cluster.Others[1]))
 
 	// then
-	c.Assert(l.matchIndex[Id(2)], Equals, Index(2))
-	c.Assert(l.matchIndex[Id(3)], Equals, Index(2))
-	c.Assert(l.matchIndex[Id(4)], Equals, Index(0))
-	c.Assert(l.matchIndex[Id(5)], Equals, Index(1))
+	c.Assert(l.matchIndex[commCfg.cluster.Others[0]], Equals, Index(3))
+	c.Assert(l.nextIndex[commCfg.cluster.Others[0]], Equals, Index(4))
+	c.Assert(l.matchIndex[commCfg.cluster.Others[1]], Equals, Index(3))
+	c.Assert(l.nextIndex[commCfg.cluster.Others[1]], Equals, Index(4))
+	c.Assert(l.matchIndex[commCfg.cluster.Others[2]], Equals, Index(0))
+	c.Assert(l.nextIndex[commCfg.cluster.Others[2]], Equals, Index(1))
+	c.Assert(l.matchIndex[commCfg.cluster.Others[3]], Equals, Index(1))
+	c.Assert(l.nextIndex[commCfg.cluster.Others[3]], Equals, Index(2))
 
 	c.Assert(res1, Equals, NullMsg)
-	if payload, ok := res2.Payload.(*CmdResp); ok {
-		c.Assert(payload.Success, Equals, true)
-		c.Assert(res2.To, Equals, Id(999))
+	if msgs, ok := res2.Payload.([]Msg); ok {
+		c.Assert(len(msgs), Equals, 2)
 
-		_, exist := l.clientCtxs[Index(2)]
-		c.Assert(exist, Equals, false)
+		for _, msg := range msgs {
+			if payload, ok := msg.Payload.(*CmdResp); ok {
+				c.Assert(payload.Success, Equals, true)
+				c.Assert(msg.To, Equals, Id(999))
 
-		c.Assert(l.commitIndex, Equals, Index(2))
+				_, exist := l.clientCtxs[Index(2)]
+				c.Assert(exist, Equals, false)
+
+				c.Assert(l.commitIndex, Equals, Index(3))
+			} else {
+				c.Fail()
+				c.Logf("Should get CmdResp")
+			}
+		}
 	} else {
 		c.Fail()
-		c.Logf("Should get CmdResp")
+		c.Logf("Should get Composed msg")
 	}
 }
 
@@ -183,7 +212,7 @@ func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
 
-	fid := Id(2)
+	fid := commCfg.cluster.Others[1]
 	l.nextIndex[fid] = 4
 
 	resp := Msg{
@@ -224,7 +253,7 @@ func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailu
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
 
-	fid := Id(2)
+	fid := commCfg.cluster.Others[1]
 	l.nextIndex[fid] = 4
 
 	resp := Msg{

@@ -8,6 +8,8 @@ const InvalidId Id = -1
 
 const All Id = -2
 
+const Composed Id = -3
+
 // InvalidTerm is the init value of term, which will become 1 after first follower turn to candidate.
 const InvalidTerm Term = 0
 
@@ -48,12 +50,12 @@ type Config struct {
 
 func InitConfig(cls Cluster, eleTimeoutMin int64, eleTimeoutMax int64) Config {
 	return Config{
-		cluster: cls,
-		leader: InvalidId,
+		cluster:            cls,
+		leader:             InvalidId,
 		electionTimeoutMin: eleTimeoutMin,
 		electionTimeoutMax: eleTimeoutMax,
-		electionTimeout: rand.Int63n(eleTimeoutMax - eleTimeoutMin) + eleTimeoutMin,
-		tickCnt: 0,
+		electionTimeout:    rand.Int63n(eleTimeoutMax-eleTimeoutMin) + eleTimeoutMin,
+		tickCnt:            0,
 	}
 }
 
@@ -108,15 +110,24 @@ func (r *RaftBase) broadcastReq(payload interface{}) Msg {
 	return r.pointReq(All, payload)
 }
 
+func (r *RaftBase) composedReq(toSet []Id, payloadSupplier func (to Id) interface{}) Msg {
+	var msgs []Msg
+	for _, to := range toSet {
+		msgs = append(msgs, r.pointReq(to, payloadSupplier(to)))
+	}
+
+	return r.pointReq(Composed, msgs)
+}
+
 var InvalidEntry = Entry{
 	Term: InvalidTerm,
-	Idx: InvalidIndex,
-	Cmd: "",
+	Idx:  InvalidIndex,
+	Cmd:  "",
 }
 
 func (r *RaftBase) getLastEntry() Entry {
 	if len(r.log) > 0 {
-		return r.log[len(r.log) - 1]
+		return r.log[len(r.log)-1]
 	}
 
 	return InvalidEntry

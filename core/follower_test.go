@@ -185,7 +185,6 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 			Term:         4,
 			PrevLogTerm:  2,
 			PrevLogIndex: 2,
-			Entries:      []Entry{{Term: 3, Idx: 3, Cmd: ""}, {Term: 3, Idx: 4, Cmd: ""}, {Term: 4, Idx: 5, Cmd: ""}},
 		},
 	}
 
@@ -215,7 +214,6 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 			Term:         4,
 			PrevLogTerm:  3,
 			PrevLogIndex: 5,
-			Entries:      []Entry{{Term: 4, Idx: 6, Cmd: ""}},
 		},
 	}
 
@@ -243,8 +241,8 @@ func (t *T) TestFollowerReturnTrueButNotAppendLogWhenReceiveHeartbeatMsg(c *C) {
 		Tp: Rpc,
 		Payload: &AppendEntriesReq{
 			Term:         4,
-			PrevLogTerm:  InvalidTerm,
-			PrevLogIndex: InvalidIndex,
+			PrevLogTerm:  4,
+			PrevLogIndex: 5,
 			Entries:      []Entry{},
 		},
 	}
@@ -269,14 +267,14 @@ func (t *T) TestFollowerReturnTrueButNotAppendLogWhenReceiveHeartbeatMsg(c *C) {
 	c.Assert(f.log, DeepEquals, originalLog)
 }
 
-func (t *T) TestFollowerShouldApplyLogWhenReceiveHeartbeatMsgContainsNewCommittedIdx(c *C) {
+func (t *T) TestFollowerShouldApplyCmdWhenReceiveHeartbeatMsgContainsNewCommittedIdx(c *C) {
 	// given
 	heartbeat := Msg{
 		Tp: Rpc,
 		Payload: &AppendEntriesReq{
 			Term:         4,
-			PrevLogTerm:  InvalidTerm,
-			PrevLogIndex: InvalidIndex,
+			PrevLogTerm:  1,
+			PrevLogIndex: 2,
 			Entries:      []Entry{},
 			LeaderCommit: 2,
 		},

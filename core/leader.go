@@ -1,6 +1,6 @@
 package core
 
-var heartbeatInterval = 3
+var heartbeatDivideFactor int64 = 2
 
 type clientCtx struct {
 	clientId Id
@@ -8,7 +8,7 @@ type clientCtx struct {
 
 type Leader struct {
 	RaftBase
-	heartbeatIntervalCnt int
+	heartbeatIntervalCnt int64
 	clientCtxs           map[Index]clientCtx
 	nextIndex            map[Id]Index
 	matchIndex           map[Id]Index
@@ -45,18 +45,19 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 
 func (l *Leader) sendHeartbeat() Msg {
 	l.heartbeatIntervalCnt++
-	if l.heartbeatIntervalCnt < heartbeatInterval {
+	if l.heartbeatIntervalCnt < (l.cfg.electionTimeoutMin / heartbeatDivideFactor) {
 		return NullMsg
 	}
 
 	l.heartbeatIntervalCnt = 0
 
 	// send heartbeat (empty append log rpc)
+	lastEntry := l.getLastEntry()
 	return l.broadcastReq(&AppendEntriesReq{
 		Term:         l.currentTerm,
 		LeaderId:     l.cfg.cluster.Me,
-		PrevLogIndex: InvalidIndex,
-		PrevLogTerm:  InvalidTerm,
+		PrevLogIndex: lastEntry.Idx,
+		PrevLogTerm:  lastEntry.Term,
 		Entries:      []Entry{},
 		LeaderCommit: l.commitIndex,
 	})
@@ -101,7 +102,9 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 		return l.resendAppendLogWithDecreasedIdx(msg.From)
 	}
 
-	l.matchIndex[msg.From]++
+	// update nextId and matchedId to last
+	l.matchIndex[msg.From] = l.getLastEntry().Idx
+	l.nextIndex[msg.From] = l.matchIndex[msg.From] + 1
 	currFollowerMatchedIdx := l.matchIndex[msg.From]
 
 	majorityCnt := 1
@@ -111,18 +114,32 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 		}
 	}
 
+	var idSet []Id
+	payloadMap := make(map[Id]interface{})
 	if majorityCnt >= l.cfg.cluster.majorityCnt() {
 		// send resp only if there is a not-yet-response cmd req existed
-		if v, ok := l.clientCtxs[currFollowerMatchedIdx]; ok {
-			l.commitIndex = currFollowerMatchedIdx
+		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
+			v, exist := l.clientCtxs[i]
+			if !exist {
+				continue
+			}
+
+			l.commitIndex = i
 			res := l.applyCmdToStateMachine()
 
-			delete(l.clientCtxs, currFollowerMatchedIdx)
-			return l.pointReq(v.clientId, &CmdResp{Result: res, Success: true})
+			delete(l.clientCtxs, i)
+			idSet = append(idSet, v.clientId)
+			payloadMap[v.clientId] = res
 		}
 	}
 
-	return NullMsg
+	if len(idSet) == 0 {
+		return NullMsg
+	}
+
+	return l.composedReq(idSet, func(to Id) interface{} {
+		return &CmdResp{Result: payloadMap[to], Success: true}
+	})
 }
 
 func (l *Leader) resendAppendLogWithDecreasedIdx(followerId Id) Msg {

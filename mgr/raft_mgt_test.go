@@ -60,6 +60,10 @@ type fakeRaftObject struct{ mock.Mock }
 
 func (f *fakeRaftObject) TakeAction(msg core.Msg) core.Msg {
 	ret := f.Called(msg).Get(0).(core.Msg)
+	if msg.Tp == core.Tick {
+		return core.NullMsg
+	}
+
 	ret.From = msg.To
 	if ret.To != core.All {
 		ret.To = msg.From

@@ -1,7 +1,6 @@
 package mgr
 
 import (
-	"fmt"
 	"github.com/LENSHOOD/go-raft/core"
 	"hash/fnv"
 	"log"
@@ -22,8 +21,8 @@ type Config struct {
 	Me                   Address
 	Others               []Address
 	TickIntervalMilliSec int64
-	ElectionTimeoutMin int64
-	ElectionTimeoutMax int64
+	ElectionTimeoutMin   int64
+	ElectionTimeoutMax   int64
 }
 
 type addrIdMapper struct {
@@ -145,7 +144,7 @@ type RaftManager struct {
 	ticker *time.Ticker
 	cfg    Config
 	addrIdMapper
-	switcher switcher
+	switcher   switcher
 	Dispatcher dispatcher
 }
 
@@ -164,7 +163,6 @@ func (m *RaftManager) Run() {
 		case _ = <-m.ticker.C:
 			res = m.obj.(core.RaftObject).TakeAction(core.Msg{Tp: core.Tick})
 		case req := <-m.input:
-			logger.Printf("[MGR] Received from %s: %s", req.Addr, req.Payload)
 			tp := core.Rpc
 			if _, ok := req.Payload.(*core.CmdReq); ok {
 				tp = core.Cmd
@@ -191,27 +189,39 @@ func (m *RaftManager) Run() {
 }
 
 func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
-	var addrs []Address
-	if to == core.All {
-		addrs = append(addrs, m.cfg.Others...)
-	} else if addr, exist := m.getAddrById(to); exist {
-		addrs = append(addrs, addr)
-	} else {
-		return fmt.Errorf("dest not exist, id: %d", to)
-	}
-
-	for _, addr := range addrs {
-		m.Dispatcher.dispatch(&Rpc{
-			Addr:    addr,
-			Payload: payload,
-		})
-
-		if _, ok := payload.(*core.CmdResp); ok {
-			m.remove(addr)
-			m.Dispatcher.Cancel(addr)
+	buildRpc := func(to core.Id, payload interface{}) *Rpc {
+		if addr, exist := m.getAddrById(to); exist {
+			return &Rpc{addr, payload}
 		}
 
-		logger.Printf("[MGR] Sent: [%s], msg: %s", addr, payload)
+		logger.Fatalf("dest not exist, id: %d", to)
+		return nil
+	}
+
+	dispatch := func(rpc *Rpc) {
+		if rpc == nil {
+			return
+		}
+
+		m.Dispatcher.dispatch(rpc)
+
+		if _, ok := payload.(*core.CmdResp); ok {
+			m.remove(rpc.Addr)
+			m.Dispatcher.Cancel(rpc.Addr)
+		}
+	}
+
+	switch to {
+	case core.All:
+		for _, addr := range m.cfg.Others {
+			dispatch(&Rpc{addr, payload})
+		}
+	case core.Composed:
+		for _, msg := range payload.([]core.Msg) {
+			dispatch(buildRpc(msg.To, msg.Payload))
+		}
+	default:
+		dispatch(buildRpc(to, payload))
 	}
 
 	return nil
@@ -224,8 +234,8 @@ func (m *RaftManager) Stop() {
 
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManager {
 	mgr := RaftManager{
-		input:  inputCh,
-		cfg:    cfg,
+		input: inputCh,
+		cfg:   cfg,
 	}
 
 	// build cluster with id
@@ -243,6 +253,7 @@ func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManage
 }
 
 var hash = fnv.New64()
+
 func genId(addr Address) core.Id {
 	_, _ = hash.Write([]byte(addr))
 	return core.Id(hash.Sum64())

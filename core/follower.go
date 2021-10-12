@@ -94,28 +94,26 @@ func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 		return buildResp(false)
 	}
 
-	// ignore heartbeat
-	if len(req.Entries) == 0 {
-		f.tryApplyCmd(req.LeaderCommit)
-		return buildResp(true)
-	}
-
 	matched, logPos := matchPrev(f.log, req.PrevLogTerm, req.PrevLogIndex)
 	if !matched {
 		return buildResp(false)
 	}
 
-	replicateBeginPos := 0
-	for _, v := range req.Entries {
-		if logPos == -1 || f.log[logPos] != v {
-			break
+	// no need to append log if receive heartbeat
+	if len(req.Entries) != 0 {
+		replicateBeginPos := 0
+		for _, v := range req.Entries {
+			if logPos == -1 || f.log[logPos] != v {
+				break
+			}
+
+			logPos++
+			replicateBeginPos++
 		}
 
-		logPos++
-		replicateBeginPos++
+		f.log = append(f.log[:logPos+1], req.Entries[replicateBeginPos:]...)
 	}
 
-	f.log = append(f.log[:logPos+1], req.Entries[replicateBeginPos:]...)
 	f.tryApplyCmd(req.LeaderCommit)
 	return buildResp(true)
 }
@@ -129,7 +127,7 @@ func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 	for i := len(log) - 1; i >= 0; i-- {
 		entry := log[i]
 		if entry.Term < term {
-			return false, -1
+			return false, -2
 		}
 
 		if entry.Term == term && entry.Idx == idx {
@@ -137,7 +135,7 @@ func matchPrev(log []Entry, term Term, idx Index) (matched bool, logPos int) {
 		}
 	}
 
-	return false, -1
+	return false, -2
 }
 
 func (f *Follower) tryApplyCmd(leaderCommitIdx Index) {
