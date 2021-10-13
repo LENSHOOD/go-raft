@@ -6,8 +6,8 @@ import (
 	"github.com/LENSHOOD/go-raft/mgr"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
+	"io"
 	"log"
-	"time"
 )
 
 var logger = log.Default()
@@ -25,13 +25,35 @@ func NewServer(inputCh chan *mgr.Rpc, mgr *mgr.RaftManager) *RaftServer {
 	}
 }
 
-func (s *RaftServer) RequestVote(ctx context.Context, in *RequestVoteArguments) (*RequestVoteResults, error) {
-	resp := s.serve(ctx, MapToRequestVoteReq(in)).(*core.RequestVoteResp)
-	return MapToRequestVoteResults(resp), nil
+func (s *RaftServer) RequestVote(stream RaftRpc_RequestVoteServer) error {
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		resp := s.serve(stream.Context(), MapToRequestVoteReq(in)).(*core.RequestVoteResp)
+		if err := stream.Send(MapToRequestVoteResults(resp)); err != nil {
+			return err
+		}
+	}
 }
-func (s *RaftServer) AppendEntries(ctx context.Context, in *AppendEntriesArguments) (*AppendEntriesResults, error) {
-	resp := s.serve(ctx, MapToAppendEntriesReq(in)).(*core.AppendEntriesResp)
-	return MapToAppendEntriesResults(resp), nil
+func (s *RaftServer) AppendEntries(stream RaftRpc_AppendEntriesServer) error {
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		resp := s.serve(stream.Context(), MapToAppendEntriesReq(in)).(*core.AppendEntriesResp)
+		if err := stream.Send(MapToAppendEntriesResults(resp)); err != nil {
+			return err
+		}
+	}
 }
 func (s *RaftServer) ExecCmd(ctx context.Context, in *CmdRequest) (*CmdResponse, error) {
 	resp := s.serve(ctx, MapToCmdReq(in)).(*core.CmdResp)
@@ -55,20 +77,120 @@ func (s *RaftServer) serve(ctx context.Context, inPayload interface{}) (outPaylo
 	return res.Payload
 }
 
+type worker struct {
+	inputCh  chan *mgr.Rpc
+	outputCh chan *mgr.Rpc
+	done     chan struct{}
+	addr     mgr.Address
+	conn     *grpc.ClientConn
+	rv       RaftRpc_RequestVoteClient
+	ae       RaftRpc_AppendEntriesClient
+}
+
+func (w *worker) run() {
+	for {
+		select {
+		case <-w.done:
+			_ = w.conn.Close()
+			return
+		case rpc := <-w.inputCh:
+			w.sendReq(rpc)
+		}
+	}
+}
+func (w *worker) getConn() *grpc.ClientConn {
+	if w.conn != nil {
+		return w.conn
+	}
+
+	conn, err := grpc.Dial(string(w.addr), grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	w.conn = conn
+	return conn
+}
+
+func (w *worker) sendReq(rpc *mgr.Rpc) {
+	var resPayload interface{}
+	switch rpc.Payload.(type) {
+	case *core.RequestVoteReq:
+		if w.rv == nil {
+			rv, err := NewRaftRpcClient(w.getConn()).RequestVote(context.Background())
+			if err != nil {
+				log.Fatalf("cannot get reuqest vote stream: %v", err)
+			}
+			w.rv = rv
+		}
+
+		if err := w.rv.Send(MapToRequestVoteArguments(rpc.Payload.(*core.RequestVoteReq))); err != nil {
+			log.Fatalf("Failed to send: %v", err)
+		}
+
+		resp, err := w.rv.Recv()
+		if err == io.EOF {
+			_ = w.rv.CloseSend()
+			w.rv = nil
+			return
+		}
+
+		if err != nil {
+			logger.Printf("[Caller] RequestVote error: %v", err)
+		} else {
+			resPayload = MapToRequestVoteResp(resp)
+		}
+
+	case *core.AppendEntriesReq:
+		if w.ae == nil {
+			ae, err := NewRaftRpcClient(w.getConn()).AppendEntries(context.Background())
+			if err != nil {
+				log.Fatalf("cannot get reuqest vote stream: %v", err)
+			}
+			w.ae = ae
+		}
+
+		if err := w.ae.Send(MapToAppendEntriesArguments(rpc.Payload.(*core.AppendEntriesReq))); err != nil {
+			log.Fatalf("Failed to send: %v", err)
+		}
+
+		resp, err := w.ae.Recv()
+		if err == io.EOF {
+			_ = w.ae.CloseSend()
+			w.ae = nil
+			return
+		}
+
+		if err != nil {
+			logger.Printf("[Caller] AppendEntries error: %v", err)
+		} else {
+			resPayload = MapToAppendEntriesResp(resp)
+		}
+	}
+
+	if resPayload != nil {
+		w.outputCh <- &mgr.Rpc{
+			Addr:    rpc.Addr,
+			Payload: resPayload,
+		}
+	}
+}
+
 type Caller struct {
 	inputCh  chan *mgr.Rpc
 	outputCh chan *mgr.Rpc
 	mgr      *mgr.RaftManager
 	done     chan struct{}
+	workers  map[mgr.Address]*worker
 }
 
-func NewCaller(recv chan *mgr.Rpc, send chan *mgr.Rpc, mgr *mgr.RaftManager) (caller *Caller, done chan struct{}) {
+func NewCaller(recv chan *mgr.Rpc, send chan *mgr.Rpc, manager *mgr.RaftManager) (caller *Caller, done chan struct{}) {
 	done = make(chan struct{})
 	caller = &Caller{
 		inputCh:  recv,
 		outputCh: send,
-		mgr:      mgr,
+		mgr:      manager,
 		done:     done,
+		workers:  make(map[mgr.Address]*worker),
 	}
 
 	return caller, done
@@ -82,44 +204,20 @@ func (c *Caller) Run() {
 		case <-c.done:
 			return
 		case rpc := <-c.inputCh:
-			go c.sendReq(rpc)
-		}
-	}
-}
+			w, exist := c.workers[rpc.Addr]
+			if !exist {
+				w = &worker{
+					inputCh:  make(chan *mgr.Rpc, 10),
+					outputCh: c.outputCh,
+					done:     make(chan struct{}),
+					addr:     rpc.Addr,
+				}
 
-func (c *Caller) sendReq(rpc *mgr.Rpc) {
-	conn, err := grpc.Dial(string(rpc.Addr), grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
+				c.workers[rpc.Addr] = w
+				go w.run()
+			}
 
-	ctx, canceled := context.WithDeadline(context.Background(), time.Now().Add(10*time.Millisecond))
-	defer canceled()
-
-	var resPayload interface{}
-	switch rpc.Payload.(type) {
-	case *core.RequestVoteReq:
-		resp, err := NewRaftRpcClient(conn).RequestVote(ctx, MapToRequestVoteArguments(rpc.Payload.(*core.RequestVoteReq)))
-		if err != nil {
-			logger.Printf("[Caller] RequestVote error: %v", err)
-		} else {
-			resPayload = MapToRequestVoteResp(resp)
-		}
-
-	case *core.AppendEntriesReq:
-		resp, err := NewRaftRpcClient(conn).AppendEntries(ctx, MapToAppendEntriesArguments(rpc.Payload.(*core.AppendEntriesReq)))
-		if err != nil {
-			logger.Printf("[Caller] AppendEntries error: %v", err)
-		} else {
-			resPayload = MapToAppendEntriesResp(resp)
-		}
-	}
-
-	if resPayload != nil {
-		c.outputCh <- &mgr.Rpc{
-			Addr:    rpc.Addr,
-			Payload: resPayload,
+			w.inputCh <- rpc
 		}
 	}
 }

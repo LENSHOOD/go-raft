@@ -18,8 +18,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RaftRpcClient interface {
-	RequestVote(ctx context.Context, in *RequestVoteArguments, opts ...grpc.CallOption) (*RequestVoteResults, error)
-	AppendEntries(ctx context.Context, in *AppendEntriesArguments, opts ...grpc.CallOption) (*AppendEntriesResults, error)
+	RequestVote(ctx context.Context, opts ...grpc.CallOption) (RaftRpc_RequestVoteClient, error)
+	AppendEntries(ctx context.Context, opts ...grpc.CallOption) (RaftRpc_AppendEntriesClient, error)
 	ExecCmd(ctx context.Context, in *CmdRequest, opts ...grpc.CallOption) (*CmdResponse, error)
 }
 
@@ -31,22 +31,66 @@ func NewRaftRpcClient(cc grpc.ClientConnInterface) RaftRpcClient {
 	return &raftRpcClient{cc}
 }
 
-func (c *raftRpcClient) RequestVote(ctx context.Context, in *RequestVoteArguments, opts ...grpc.CallOption) (*RequestVoteResults, error) {
-	out := new(RequestVoteResults)
-	err := c.cc.Invoke(ctx, "/api.RaftRpc/RequestVote", in, out, opts...)
+func (c *raftRpcClient) RequestVote(ctx context.Context, opts ...grpc.CallOption) (RaftRpc_RequestVoteClient, error) {
+	stream, err := c.cc.NewStream(ctx, &RaftRpc_ServiceDesc.Streams[0], "/api.RaftRpc/RequestVote", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &raftRpcRequestVoteClient{stream}
+	return x, nil
 }
 
-func (c *raftRpcClient) AppendEntries(ctx context.Context, in *AppendEntriesArguments, opts ...grpc.CallOption) (*AppendEntriesResults, error) {
-	out := new(AppendEntriesResults)
-	err := c.cc.Invoke(ctx, "/api.RaftRpc/AppendEntries", in, out, opts...)
+type RaftRpc_RequestVoteClient interface {
+	Send(*RequestVoteArguments) error
+	Recv() (*RequestVoteResults, error)
+	grpc.ClientStream
+}
+
+type raftRpcRequestVoteClient struct {
+	grpc.ClientStream
+}
+
+func (x *raftRpcRequestVoteClient) Send(m *RequestVoteArguments) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *raftRpcRequestVoteClient) Recv() (*RequestVoteResults, error) {
+	m := new(RequestVoteResults)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *raftRpcClient) AppendEntries(ctx context.Context, opts ...grpc.CallOption) (RaftRpc_AppendEntriesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &RaftRpc_ServiceDesc.Streams[1], "/api.RaftRpc/AppendEntries", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &raftRpcAppendEntriesClient{stream}
+	return x, nil
+}
+
+type RaftRpc_AppendEntriesClient interface {
+	Send(*AppendEntriesArguments) error
+	Recv() (*AppendEntriesResults, error)
+	grpc.ClientStream
+}
+
+type raftRpcAppendEntriesClient struct {
+	grpc.ClientStream
+}
+
+func (x *raftRpcAppendEntriesClient) Send(m *AppendEntriesArguments) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *raftRpcAppendEntriesClient) Recv() (*AppendEntriesResults, error) {
+	m := new(AppendEntriesResults)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (c *raftRpcClient) ExecCmd(ctx context.Context, in *CmdRequest, opts ...grpc.CallOption) (*CmdResponse, error) {
@@ -62,8 +106,8 @@ func (c *raftRpcClient) ExecCmd(ctx context.Context, in *CmdRequest, opts ...grp
 // All implementations must embed UnimplementedRaftRpcServer
 // for forward compatibility
 type RaftRpcServer interface {
-	RequestVote(context.Context, *RequestVoteArguments) (*RequestVoteResults, error)
-	AppendEntries(context.Context, *AppendEntriesArguments) (*AppendEntriesResults, error)
+	RequestVote(RaftRpc_RequestVoteServer) error
+	AppendEntries(RaftRpc_AppendEntriesServer) error
 	ExecCmd(context.Context, *CmdRequest) (*CmdResponse, error)
 	mustEmbedUnimplementedRaftRpcServer()
 }
@@ -72,11 +116,11 @@ type RaftRpcServer interface {
 type UnimplementedRaftRpcServer struct {
 }
 
-func (UnimplementedRaftRpcServer) RequestVote(context.Context, *RequestVoteArguments) (*RequestVoteResults, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RequestVote not implemented")
+func (UnimplementedRaftRpcServer) RequestVote(RaftRpc_RequestVoteServer) error {
+	return status.Errorf(codes.Unimplemented, "method RequestVote not implemented")
 }
-func (UnimplementedRaftRpcServer) AppendEntries(context.Context, *AppendEntriesArguments) (*AppendEntriesResults, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AppendEntries not implemented")
+func (UnimplementedRaftRpcServer) AppendEntries(RaftRpc_AppendEntriesServer) error {
+	return status.Errorf(codes.Unimplemented, "method AppendEntries not implemented")
 }
 func (UnimplementedRaftRpcServer) ExecCmd(context.Context, *CmdRequest) (*CmdResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExecCmd not implemented")
@@ -94,40 +138,56 @@ func RegisterRaftRpcServer(s grpc.ServiceRegistrar, srv RaftRpcServer) {
 	s.RegisterService(&RaftRpc_ServiceDesc, srv)
 }
 
-func _RaftRpc_RequestVote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RequestVoteArguments)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RaftRpcServer).RequestVote(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/api.RaftRpc/RequestVote",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RaftRpcServer).RequestVote(ctx, req.(*RequestVoteArguments))
-	}
-	return interceptor(ctx, in, info, handler)
+func _RaftRpc_RequestVote_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(RaftRpcServer).RequestVote(&raftRpcRequestVoteServer{stream})
 }
 
-func _RaftRpc_AppendEntries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AppendEntriesArguments)
-	if err := dec(in); err != nil {
+type RaftRpc_RequestVoteServer interface {
+	Send(*RequestVoteResults) error
+	Recv() (*RequestVoteArguments, error)
+	grpc.ServerStream
+}
+
+type raftRpcRequestVoteServer struct {
+	grpc.ServerStream
+}
+
+func (x *raftRpcRequestVoteServer) Send(m *RequestVoteResults) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *raftRpcRequestVoteServer) Recv() (*RequestVoteArguments, error) {
+	m := new(RequestVoteArguments)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
-	if interceptor == nil {
-		return srv.(RaftRpcServer).AppendEntries(ctx, in)
+	return m, nil
+}
+
+func _RaftRpc_AppendEntries_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(RaftRpcServer).AppendEntries(&raftRpcAppendEntriesServer{stream})
+}
+
+type RaftRpc_AppendEntriesServer interface {
+	Send(*AppendEntriesResults) error
+	Recv() (*AppendEntriesArguments, error)
+	grpc.ServerStream
+}
+
+type raftRpcAppendEntriesServer struct {
+	grpc.ServerStream
+}
+
+func (x *raftRpcAppendEntriesServer) Send(m *AppendEntriesResults) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *raftRpcAppendEntriesServer) Recv() (*AppendEntriesArguments, error) {
+	m := new(AppendEntriesArguments)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
 	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/api.RaftRpc/AppendEntries",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RaftRpcServer).AppendEntries(ctx, req.(*AppendEntriesArguments))
-	}
-	return interceptor(ctx, in, info, handler)
+	return m, nil
 }
 
 func _RaftRpc_ExecCmd_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -156,18 +216,23 @@ var RaftRpc_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*RaftRpcServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RequestVote",
-			Handler:    _RaftRpc_RequestVote_Handler,
-		},
-		{
-			MethodName: "AppendEntries",
-			Handler:    _RaftRpc_AppendEntries_Handler,
-		},
-		{
 			MethodName: "ExecCmd",
 			Handler:    _RaftRpc_ExecCmd_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "RequestVote",
+			Handler:       _RaftRpc_RequestVote_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "AppendEntries",
+			Handler:       _RaftRpc_AppendEntries_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "raft_rpc.proto",
 }
