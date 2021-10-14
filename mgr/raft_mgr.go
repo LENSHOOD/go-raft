@@ -138,10 +138,43 @@ func (d *dispatcher) clearAll() {
 	d.reqOutput = nil
 }
 
+type Ticker interface {
+	GetTickCh() <-chan time.Time
+	Start()
+	Stop()
+}
+
+type defaultTicker struct {
+	d time.Duration
+	ticker *time.Ticker
+}
+
+func (dt *defaultTicker) GetTickCh() <-chan time.Time {
+	return dt.ticker.C
+}
+
+func (dt *defaultTicker) Start() {
+	dt.ticker.Reset(dt.d)
+}
+
+func (dt *defaultTicker) Stop() {
+	dt.ticker.Stop()
+}
+
+func NewDefaultTicker(d time.Duration) *defaultTicker {
+	ticker := time.NewTicker(d)
+	ticker.Stop()
+
+	return &defaultTicker{
+		d: d,
+		ticker: ticker,
+	}
+}
+
 type RaftManager struct {
 	obj    core.RaftObject
 	input  chan *Rpc
-	ticker *time.Ticker
+	ticker Ticker
 	cfg    Config
 	addrIdMapper
 	switcher   switcher
@@ -154,16 +187,16 @@ func (m *RaftManager) Run() {
 		return
 	}
 
-	logger.Printf("[MGR] Raft Manager Started.")
-	m.ticker = time.NewTicker(time.Millisecond * time.Duration(m.cfg.TickIntervalMilliSec))
+	m.ticker.Start()
+	logger.Printf("[MGR-%s] Raft Manager Started.", m.cfg.Me)
 
 	for !m.switcher.isOff() {
 		res := core.NullMsg
 		select {
-		case _ = <-m.ticker.C:
+		case _ = <-m.ticker.GetTickCh():
 			res = m.obj.(core.RaftObject).TakeAction(core.Msg{Tp: core.Tick})
 		case req := <-m.input:
-			logger.Printf("[MGR] Received from %s: %s", req.Addr, req.Payload)
+			logger.Printf("[MGR-%s] Received from %s: %s", m.cfg.Me, req.Addr, req.Payload)
 			tp := core.Rpc
 			if _, ok := req.Payload.(*core.CmdReq); ok {
 				tp = core.Cmd
@@ -181,7 +214,7 @@ func (m *RaftManager) Run() {
 			switch res.Tp {
 			case core.MoveState:
 				m.obj = res.Payload.(core.RaftObject)
-				logger.Printf("[MGR] Role Changed: %T", res.Payload)
+				logger.Printf("[MGR-%s] Role Changed: %T", m.cfg.Me, res.Payload)
 			case core.Rpc:
 				_ = m.sendTo(res.To, res.Payload)
 			}
@@ -211,7 +244,7 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 			m.Dispatcher.Cancel(rpc.Addr)
 		}
 
-		logger.Printf("[MGR] Sent: [%s], msg: %s", rpc.Addr, payload)
+		logger.Printf("[MGR-%s] Sent: [%s], msg: %s", m.cfg.Me, rpc.Addr, payload)
 	}
 
 	switch to {
@@ -235,7 +268,16 @@ func (m *RaftManager) Stop() {
 	m.Dispatcher.clearAll()
 }
 
+func (m *RaftManager) IsLeader() bool {
+	_, ok := m.obj.(*core.Leader)
+	return ok
+}
+
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManager {
+	return NewRaftMgrWithTicker(cfg, sm, inputCh, NewDefaultTicker(time.Millisecond * time.Duration(cfg.TickIntervalMilliSec)))
+}
+
+func NewRaftMgrWithTicker(cfg Config, sm core.StateMachine, inputCh chan *Rpc, ticker Ticker) *RaftManager {
 	mgr := RaftManager{
 		input: inputCh,
 		cfg:   cfg,
@@ -248,6 +290,11 @@ func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManage
 	for _, addr := range cfg.Others {
 		cls.Others = append(cls.Others, mgr.getIdByAddr(addr))
 	}
+
+	if ticker == nil {
+		log.Fatalf("Ticker should be provided.")
+	}
+	mgr.ticker = ticker
 
 	// as always, follower at beginning
 	mgr.obj = core.NewFollower(core.InitConfig(cls, cfg.ElectionTimeoutMin, cfg.ElectionTimeoutMax), sm)
