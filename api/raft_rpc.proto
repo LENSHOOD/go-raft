@@ -3,8 +3,8 @@ option go_package = "github.com/LENSHOOD/go-raft/api";
 package api;
 
 service RaftRpc {
-  rpc RequestVote(stream RequestVoteArguments) returns (stream RequestVoteResults);
-  rpc AppendEntries(stream AppendEntriesArguments) returns (stream AppendEntriesResults);
+  rpc RequestVote(RequestVoteArguments) returns (RequestVoteResults);
+  rpc AppendEntries(AppendEntriesArguments) returns (AppendEntriesResults);
 
   rpc ExecCmd(CmdRequest) returns (CmdResponse);
 }
