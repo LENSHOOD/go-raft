@@ -21,6 +21,7 @@ var commCfg = mgr.Config{
 	TickIntervalMilliSec: 30,
 	ElectionTimeoutMin:   10,
 	ElectionTimeoutMax:   50,
+	DebugMode:            true,
 }
 
 // mock state machine
@@ -75,19 +76,25 @@ func newSvr(srvNo int) *svr {
 }
 
 type router struct {
-	done chan struct{}
-	svrs map[mgr.Address]*svr
-	rw   sync.RWMutex
+	done         chan struct{}
+	svrs         map[mgr.Address]*svr
+	svrOutputChs map[mgr.Address][]<-chan *mgr.Rpc
+	holds        sync.Map
+	rw           sync.RWMutex
 }
 
 func newRouter() *router {
-	return &router{done: make(chan struct{}), svrs: make(map[mgr.Address]*svr)}
+	return &router{done: make(chan struct{}), svrs: make(map[mgr.Address]*svr), svrOutputChs: make(map[mgr.Address][]<-chan *mgr.Rpc)}
 }
 
 func (r *router) register(svr *svr) {
 	r.rw.Lock()
 	defer r.rw.Unlock()
 	r.svrs[svr.addr] = svr
+	for _, ch := range svr.respChs {
+		r.svrOutputChs[svr.addr] = append(r.svrOutputChs[svr.addr], ch)
+	}
+	r.svrOutputChs[svr.addr] = append(r.svrOutputChs[svr.addr], svr.reqOutputCh)
 }
 
 func (r *router) run() {
@@ -95,23 +102,25 @@ func (r *router) run() {
 		go svr.mgr.Run()
 	}
 
-	send := func(addr mgr.Address, msg *mgr.Rpc) {
+	send := func(sender mgr.Address, msg *mgr.Rpc) {
+		receiver := msg.Addr
+		if _, exist := r.holds.Load(receiver); exist {
+			return
+		}
+
 		r.rw.RLock()
 		defer r.rw.RUnlock()
-		target := msg.Addr
-		msg.Addr = addr
-		r.svrs[target].inputCh <- msg
+		msg.Addr = sender
+		r.svrs[receiver].inputCh <- msg
 	}
 
 	for {
-		for addr, svr := range r.svrs {
+		for addr := range r.svrs {
 			select {
 			case <-r.done:
 				return
-			case msg := <-svr.reqOutputCh:
-				go send(addr, msg)
 			default:
-				for _, ch := range svr.respChs {
+				for _, ch := range r.svrOutputChs[addr] {
 					select {
 					case msg := <-ch:
 						go send(addr, msg)
@@ -122,4 +131,12 @@ func (r *router) run() {
 			}
 		}
 	}
+}
+
+func (r *router) hold(svr *svr) {
+	r.holds.Store(svr.addr, nil)
+}
+
+func (r *router) resume(svr *svr) {
+	r.holds.Delete(svr.addr)
 }

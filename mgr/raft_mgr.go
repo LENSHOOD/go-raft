@@ -22,7 +22,8 @@ type Config struct {
 	Others               []Address
 	TickIntervalMilliSec int64
 	ElectionTimeoutMin   int64
-	ElectionTimeoutMax   int64
+	ElectionTimeoutMax int64
+	DebugMode          bool
 }
 
 type addrIdMapper struct {
@@ -145,7 +146,7 @@ type Ticker interface {
 }
 
 type defaultTicker struct {
-	d time.Duration
+	d      time.Duration
 	ticker *time.Ticker
 }
 
@@ -166,7 +167,7 @@ func NewDefaultTicker(d time.Duration) *defaultTicker {
 	ticker.Stop()
 
 	return &defaultTicker{
-		d: d,
+		d:      d,
 		ticker: ticker,
 	}
 }
@@ -268,13 +269,26 @@ func (m *RaftManager) Stop() {
 	m.Dispatcher.clearAll()
 }
 
+func (m *RaftManager) assertDebugMode() {
+	if !m.cfg.DebugMode {
+		log.Fatalf("Cannot run debug method if DebugMode is off.")
+	}
+}
+
 func (m *RaftManager) IsLeader() bool {
+	m.assertDebugMode()
 	_, ok := m.obj.(*core.Leader)
 	return ok
 }
 
+func (m *RaftManager) IsCandidate() bool {
+	m.assertDebugMode()
+	_, ok := m.obj.(*core.Candidate)
+	return ok
+}
+
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManager {
-	return NewRaftMgrWithTicker(cfg, sm, inputCh, NewDefaultTicker(time.Millisecond * time.Duration(cfg.TickIntervalMilliSec)))
+	return NewRaftMgrWithTicker(cfg, sm, inputCh, NewDefaultTicker(time.Millisecond*time.Duration(cfg.TickIntervalMilliSec)))
 }
 
 func NewRaftMgrWithTicker(cfg Config, sm core.StateMachine, inputCh chan *Rpc, ticker Ticker) *RaftManager {
