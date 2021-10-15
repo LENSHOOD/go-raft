@@ -163,7 +163,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 	rpc := &Rpc{Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
 	inputCh <- rpc
 	go mgr.Run()
-	for len(inputCh) != 0 {
+	for len(inputCh) != 0 || len(outputCh) == 0 {
 	}
 	mgr.Stop()
 

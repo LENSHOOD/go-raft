@@ -118,13 +118,13 @@ func (d *dispatcher) dispatch(rpc *Rpc) {
 		if d.reqOutput != nil {
 			d.reqOutput <- rpc
 		} else {
-			logger.Fatalf("[MGR] request channel haven't registered yet, dispatch failed...")
+			logger.Printf("[MGR] request channel haven't registered yet, dispatch failed...")
 		}
 	case *core.AppendEntriesResp, *core.RequestVoteResp, *core.CmdResp:
 		if ch, exist := d.respOutputs.Load(rpc.Addr); exist {
 			ch.(chan *Rpc) <- rpc
 		} else {
-			logger.Fatalf("[MGR] response channel not found: %s, dispatch failed...", rpc.Addr)
+			logger.Printf("[MGR] response channel not found: %s, dispatch failed...", rpc.Addr)
 		}
 	}
 }
@@ -217,13 +217,13 @@ func (m *RaftManager) Run() {
 				m.obj = res.Payload.(core.RaftObject)
 				logger.Printf("[MGR-%s] Role Changed: %T", m.cfg.Me, res.Payload)
 			case core.Rpc:
-				_ = m.sendTo(res.To, res.Payload)
+				go m.sendTo(res.To, res.Payload)
 			}
 		}
 	}
 }
 
-func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
+func (m *RaftManager) sendTo(to core.Id, payload interface{}) {
 	buildRpc := func(to core.Id, payload interface{}) *Rpc {
 		if addr, exist := m.getAddrById(to); exist {
 			return &Rpc{addr, payload}
@@ -260,8 +260,6 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) error {
 	default:
 		dispatch(buildRpc(to, payload))
 	}
-
-	return nil
 }
 
 func (m *RaftManager) Stop() {
@@ -284,6 +282,12 @@ func (m *RaftManager) IsLeader() bool {
 func (m *RaftManager) IsCandidate() bool {
 	m.assertDebugMode()
 	_, ok := m.obj.(*core.Candidate)
+	return ok
+}
+
+func (m *RaftManager) IsFollower() bool {
+	m.assertDebugMode()
+	_, ok := m.obj.(*core.Follower)
 	return ok
 }
 

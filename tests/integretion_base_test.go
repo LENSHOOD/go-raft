@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/LENSHOOD/go-raft/mgr"
 	. "gopkg.in/check.v1"
@@ -103,8 +104,11 @@ func (r *router) run() {
 	}
 
 	send := func(sender mgr.Address, msg *mgr.Rpc) {
+		// if sender or receiver already held, not send form/to it.
 		receiver := msg.Addr
-		if _, exist := r.holds.Load(receiver); exist {
+		_, senderExist := r.holds.Load(sender)
+		_, receiverExist := r.holds.Load(receiver)
+		if  senderExist || receiverExist {
 			return
 		}
 
@@ -139,4 +143,23 @@ func (r *router) hold(svr *svr) {
 
 func (r *router) resume(svr *svr) {
 	r.holds.Delete(svr.addr)
+}
+
+func waitCondition(condition func() bool, timeout time.Duration) (isTimeout bool) {
+	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
+	defer cancelFunc()
+
+	for !condition() {
+		if d, ok := ctx.Deadline(); !ok || d.Before(time.Now()) {
+			cancelFunc()
+		}
+
+		select {
+		case <-ctx.Done():
+			return true
+		default:
+		}
+	}
+
+	return false
 }
