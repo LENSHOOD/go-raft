@@ -108,7 +108,7 @@ func (r *router) run() {
 		receiver := msg.Addr
 		_, senderExist := r.holds.Load(sender)
 		_, receiverExist := r.holds.Load(receiver)
-		if  senderExist || receiverExist {
+		if senderExist || receiverExist {
 			return
 		}
 
@@ -143,6 +143,13 @@ func (r *router) hold(svr *svr) {
 
 func (r *router) resume(svr *svr) {
 	r.holds.Delete(svr.addr)
+}
+
+func (r *router) exec(svr *svr, cmd core.Command, clientAddr mgr.Address) {
+	svr.inputCh <- &mgr.Rpc{
+		Addr:    clientAddr,
+		Payload: &core.CmdReq{Cmd: cmd},
+	}
 }
 
 func waitCondition(condition func() bool, timeout time.Duration) (isTimeout bool) {
