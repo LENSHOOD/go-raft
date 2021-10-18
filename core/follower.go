@@ -144,6 +144,7 @@ func (f *Follower) tryApplyCmd(leaderCommitIdx Index) {
 		return
 	}
 
+	prevCommitted := f.commitIndex
 	if lastEntry.Idx < leaderCommitIdx {
 		f.commitIndex = lastEntry.Idx
 	} else {
@@ -154,7 +155,9 @@ func (f *Follower) tryApplyCmd(leaderCommitIdx Index) {
 		return
 	}
 
-	f.applyCmdToStateMachine()
+	for i := prevCommitted + 1; i <= f.commitIndex; i++ {
+		f.applyCmdToStateMachine()
+	}
 }
 
 func (f *Follower) toCandidate() *Candidate {

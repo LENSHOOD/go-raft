@@ -71,6 +71,8 @@ func (f *fakeRaftObject) TakeAction(msg core.Msg) core.Msg {
 	return ret
 }
 
+func (f *fakeRaftObject) GetAllEntries() []core.Entry { return []core.Entry{} }
+
 func (t *T) TestTick(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)

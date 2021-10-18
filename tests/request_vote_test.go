@@ -84,18 +84,8 @@ func (t *T) TestLeaderHoldWillLeadToNewLeaderElected(c *C) {
 	var oldLeader *svr
 	// wait to election
 	for {
-		if svr0.mgr.IsLeader() {
-			oldLeader = svr0
-			break
-		}
-
-		if svr1.mgr.IsLeader() {
-			oldLeader = svr1
-			break
-		}
-
-		if svr2.mgr.IsLeader() {
-			oldLeader = svr2
+		if leader, ok := getLeader([]*svr{svr0, svr1, svr2}); ok {
+			oldLeader = leader
 			break
 		}
 	}
@@ -142,19 +132,13 @@ func (t *T) TestShorterLogHolderCanNeverBeLeader(c *C) {
 	// wait to election
 	svrs := []*svr{svr0, svr1, svr2}
 	var leader *svr
-	for i := 0; ; i++ {
-		if svrs[i%3].mgr.IsLeader() {
-			leader = svrs[i%3]
+	for {
+		if l, ok := getLeader([]*svr{svr0, svr1, svr2}); ok {
+			leader = l
 			break
 		}
 	}
-
-	var followers []*svr
-	for _, s := range svrs {
-		if s != leader {
-			followers = append(followers, s)
-		}
-	}
+	followers := getFollowers(svrs)
 
 	// 1. build different log
 	// leader log: 0

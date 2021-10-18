@@ -102,8 +102,10 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 		return l.resendAppendLogWithDecreasedIdx(msg.From)
 	}
 
-	// update nextId and matchedId to last
-	l.matchIndex[msg.From] = l.getLastEntry().Idx
+	// matchedId++, nextId++, up to last idx
+	if l.matchIndex[msg.From] < l.getLastEntry().Idx {
+		l.matchIndex[msg.From]++
+	}
 	l.nextIndex[msg.From] = l.matchIndex[msg.From] + 1
 	currFollowerMatchedIdx := l.matchIndex[msg.From]
 

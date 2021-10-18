@@ -26,9 +26,12 @@ var commCfg = mgr.Config{
 }
 
 // mock state machine
-type mockStateMachine struct{}
+type mockStateMachine struct{ cmds []core.Command }
 
-func (m *mockStateMachine) Exec(cmd core.Command) interface{} { return cmd }
+func (m *mockStateMachine) Exec(cmd core.Command) interface{} {
+	m.cmds = append(m.cmds, cmd)
+	return cmd
+}
 
 type fakeTicker struct {
 	ch chan time.Time
@@ -45,6 +48,7 @@ type svr struct {
 	inputCh     chan *mgr.Rpc
 	reqOutputCh chan *mgr.Rpc
 	respChs     map[mgr.Address]<-chan *mgr.Rpc
+	sm          *mockStateMachine
 }
 
 func newSvr(srvNo int) *svr {
@@ -73,7 +77,7 @@ func newSvr(srvNo int) *svr {
 		respChs[addr] = ch
 	}
 
-	return &svr{cfg.Me, manager, inputCh, reqOutputCh, respChs}
+	return &svr{cfg.Me, manager, inputCh, reqOutputCh, respChs, mockSm}
 }
 
 type router struct {
@@ -169,4 +173,24 @@ func waitCondition(condition func() bool, timeout time.Duration) (isTimeout bool
 	}
 
 	return false
+}
+
+func getLeader(svrs []*svr) (leader *svr, found bool) {
+	for _, svr := range svrs {
+		if svr.mgr.IsLeader() {
+			return svr, true
+		}
+	}
+
+	return nil, false
+}
+
+func getFollowers(svrs []*svr) []*svr {
+	var followers []*svr
+	for _, svr := range svrs {
+		if svr.mgr.IsFollower() {
+			followers = append(followers, svr)
+		}
+	}
+	return followers
 }

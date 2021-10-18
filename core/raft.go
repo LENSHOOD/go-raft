@@ -1,6 +1,8 @@
 package core
 
-import "math/rand"
+import (
+	"math/rand"
+)
 
 type Id int64
 
@@ -28,6 +30,7 @@ type Entry struct {
 
 type RaftObject interface {
 	TakeAction(msg Msg) Msg
+	GetAllEntries() []Entry
 }
 
 type Cluster struct {
@@ -110,7 +113,7 @@ func (r *RaftBase) broadcastReq(payload interface{}) Msg {
 	return r.pointReq(All, payload)
 }
 
-func (r *RaftBase) composedReq(toSet []Id, payloadSupplier func (to Id) interface{}) Msg {
+func (r *RaftBase) composedReq(toSet []Id, payloadSupplier func(to Id) interface{}) Msg {
 	var msgs []Msg
 	for _, to := range toSet {
 		msgs = append(msgs, r.pointReq(to, payloadSupplier(to)))
@@ -152,4 +155,8 @@ func (r *RaftBase) applyCmdToStateMachine() interface{} {
 	res := r.sm.Exec(entry.Cmd)
 	r.lastApplied = r.commitIndex
 	return res
+}
+
+func (r *RaftBase) GetAllEntries() []Entry {
+	return r.log
 }

@@ -94,7 +94,9 @@ func (t *T) TestLeaderShouldIncrementMatchIndexToLastIdxWhenReceiveSuccessRespFr
 	}
 
 	// when
-	_ = l.TakeAction(resp)
+	for range l.log {
+		_ = l.TakeAction(resp)
+	}
 
 	// then
 	c.Assert(l.matchIndex[commCfg.cluster.Others[1]], Equals, Index(3))
@@ -142,6 +144,8 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 	// when
 	res1 := l.TakeAction(buildResp(commCfg.cluster.Others[0]))
 	res2 := l.TakeAction(buildResp(commCfg.cluster.Others[1]))
+	_ = l.TakeAction(buildResp(commCfg.cluster.Others[0]))
+	_ = l.TakeAction(buildResp(commCfg.cluster.Others[1]))
 
 	// then
 	c.Assert(l.matchIndex[commCfg.cluster.Others[0]], Equals, Index(3))
@@ -155,7 +159,7 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 
 	c.Assert(res1, Equals, NullMsg)
 	if msgs, ok := res2.Payload.([]Msg); ok {
-		c.Assert(len(msgs), Equals, 2)
+		c.Assert(len(msgs), Equals, 1)
 
 		for _, msg := range msgs {
 			if payload, ok := msg.Payload.(*CmdResp); ok {
