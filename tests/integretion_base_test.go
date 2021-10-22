@@ -17,7 +17,7 @@ type T struct{}
 
 var _ = Suite(&T{})
 
-var srvAddrs = []mgr.Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104"}
+var srvAddrs = []mgr.Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}
 var commCfg = mgr.Config{
 	TickIntervalMilliSec: 30,
 	ElectionTimeoutMin:   10,
@@ -51,13 +51,16 @@ type svr struct {
 	sm          *mockStateMachine
 }
 
-func newSvr(srvNo int) *svr {
+func newSvr(svrNo int, svrNum int) *svr {
 	inputCh := make(chan *mgr.Rpc, 10)
 
 	cfg := commCfg
-	cfg.Me = srvAddrs[srvNo]
+	cfg.Me = srvAddrs[svrNo]
 	for i, v := range srvAddrs {
-		if i == srvNo {
+		if i == svrNum {
+			break
+		}
+		if i == svrNo {
 			continue
 		}
 		cfg.Others = append(cfg.Others, v)
@@ -176,8 +179,12 @@ func waitCondition(condition func() bool, timeout time.Duration) (isTimeout bool
 }
 
 func getLeader(svrs []*svr) (leader *svr, found bool) {
+	return getLeaderWithException(svrs, nil)
+}
+
+func getLeaderWithException(svrs []*svr, exceptFor *svr) (leader *svr, found bool) {
 	for _, svr := range svrs {
-		if svr.mgr.IsLeader() {
+		if svr != exceptFor && svr.mgr.IsLeader() {
 			return svr, true
 		}
 	}
@@ -193,4 +200,40 @@ func getFollowers(svrs []*svr) []*svr {
 		}
 	}
 	return followers
+}
+
+func waitLeader(c *C, svrs []*svr) *svr {
+	return waitLeaderWithException(c, svrs, nil)
+}
+
+func waitLeaderWithException(c *C, svrs []*svr, exceptFor *svr) *svr {
+	var leader *svr
+	timeout := waitCondition(func() bool {
+		l, ok := getLeaderWithException(svrs, exceptFor)
+		leader = l
+		return ok
+	}, 10*time.Second)
+	if timeout {
+		c.Errorf("No server turned to leader before time exceeded, test failed.")
+		c.FailNow()
+	}
+
+	return leader
+}
+
+func waitNumOfSvrLogLength(c *C, svrs []*svr, logLength int, numsOfSvrs int) {
+	timeout := waitCondition(func() bool {
+		cnt := 0
+		for _, svr := range svrs {
+			if len(svr.mgr.GetAllEntries()) >= logLength {
+				cnt++
+			}
+		}
+
+		return cnt >= numsOfSvrs
+	}, 10*time.Second)
+	if timeout {
+		c.Errorf("Not enough (need &d) server's log length >= %d before time exceeded, test failed.", numsOfSvrs, logLength)
+		c.FailNow()
+	}
 }

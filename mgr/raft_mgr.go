@@ -113,6 +113,12 @@ func (d *dispatcher) Cancel(addr Address) {
 }
 
 func (d *dispatcher) dispatch(rpc *Rpc) {
+	defer func () {
+		if err := recover(); err != nil {
+			logger.Printf("[MGR] failed to dispatch due to panic: %v", err)
+		}
+	}()
+
 	switch rpc.Payload.(type) {
 	case *core.AppendEntriesReq, *core.RequestVoteReq:
 		if d.reqOutput != nil {

@@ -11,11 +11,11 @@ import (
 func (t *T) TestHappyPathLeaderElection(c *C) {
 	r := newRouter()
 
-	svr0 := newSvr(0)
+	svr0 := newSvr(0, 3)
 	r.register(svr0)
-	svr1 := newSvr(1)
+	svr1 := newSvr(1, 3)
 	r.register(svr1)
-	svr2 := newSvr(2)
+	svr2 := newSvr(2, 3)
 	r.register(svr2)
 
 	go r.run()
@@ -36,13 +36,13 @@ func (t *T) TestAllCandidateCanEventuallyBecomeLeaderOrFollower(c *C) {
 	r := newRouter()
 
 	// first hold all, to let them turn to candidate
-	svr0 := newSvr(0)
+	svr0 := newSvr(0, 3)
 	r.register(svr0)
 	r.hold(svr0)
-	svr1 := newSvr(1)
+	svr1 := newSvr(1, 3)
 	r.register(svr1)
 	r.hold(svr1)
-	svr2 := newSvr(2)
+	svr2 := newSvr(2, 3)
 	r.register(svr2)
 	r.hold(svr2)
 
@@ -72,11 +72,11 @@ func (t *T) TestLeaderHoldWillLeadToNewLeaderElected(c *C) {
 	r := newRouter()
 
 	// first hold all, to let them turn to candidate
-	svr0 := newSvr(0)
+	svr0 := newSvr(0, 3)
 	r.register(svr0)
-	svr1 := newSvr(1)
+	svr1 := newSvr(1, 3)
 	r.register(svr1)
-	svr2 := newSvr(2)
+	svr2 := newSvr(2, 3)
 	r.register(svr2)
 
 	go r.run()
@@ -120,11 +120,11 @@ func (t *T) TestLeaderHoldWillLeadToNewLeaderElected(c *C) {
 func (t *T) TestShorterLogHolderCanNeverBeLeader(c *C) {
 	r := newRouter()
 
-	svr0 := newSvr(0)
+	svr0 := newSvr(0, 3)
 	r.register(svr0)
-	svr1 := newSvr(1)
+	svr1 := newSvr(1, 3)
 	r.register(svr1)
-	svr2 := newSvr(2)
+	svr2 := newSvr(2, 3)
 	r.register(svr2)
 
 	go r.run()
