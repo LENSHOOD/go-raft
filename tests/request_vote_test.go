@@ -20,11 +20,8 @@ func (t *T) TestHappyPathLeaderElection(c *C) {
 
 	go r.run()
 
-	timeout := waitCondition(func() bool { return svr0.mgr.IsLeader() || svr1.mgr.IsLeader() || svr2.mgr.IsLeader() }, time.Second)
-	if timeout {
-		c.Errorf("No server turned to leader before time exceeded, test failed.")
-		c.Fail()
-	}
+	// can elect a leader
+	_ = waitLeader(c, []*svr{svr0, svr1, svr2})
 
 	close(r.done)
 	svr0.mgr.Stop()
@@ -45,22 +42,19 @@ func (t *T) TestAllCandidateCanEventuallyBecomeLeaderOrFollower(c *C) {
 	svr2 := newSvr(2, 3)
 	r.register(svr2)
 	r.hold(svr2)
+	svrs := []*svr{svr0, svr1, svr2}
 
 	go r.run()
 
 	// wait to become candidate
-	for !svr0.mgr.IsCandidate() || !svr1.mgr.IsCandidate() || !svr2.mgr.IsCandidate() {
-	}
+	waitAllBecomeCandidate(c, svrs)
 
 	r.resume(svr0)
 	r.resume(svr1)
 	r.resume(svr2)
 
-	timeout := waitCondition(func() bool { return svr0.mgr.IsLeader() || svr1.mgr.IsLeader() || svr2.mgr.IsLeader() }, time.Second)
-	if timeout {
-		c.Errorf("No server turned to leader before time exceeded, test failed.")
-		c.Fail()
-	}
+	// can elect a leader
+	_ = waitLeader(c, svrs)
 
 	close(r.done)
 	svr0.mgr.Stop()
@@ -78,34 +72,21 @@ func (t *T) TestLeaderHoldWillLeadToNewLeaderElected(c *C) {
 	r.register(svr1)
 	svr2 := newSvr(2, 3)
 	r.register(svr2)
+	svrs := []*svr{svr0, svr1, svr2}
 
 	go r.run()
 
-	var oldLeader *svr
 	// wait to election
-	for {
-		if leader, ok := getLeader([]*svr{svr0, svr1, svr2}); ok {
-			oldLeader = leader
-			break
-		}
-	}
+	oldLeader := waitLeader(c, svrs)
 
 	r.hold(oldLeader)
 
-	timeout := waitCondition(func() bool {
-		return (svr0 != oldLeader && svr0.mgr.IsLeader()) ||
-			(svr1 != oldLeader && svr1.mgr.IsLeader()) ||
-			(svr2 != oldLeader && svr2.mgr.IsLeader())
-	}, 5*time.Second)
-	if timeout {
-		c.Errorf("No server turned to leader before time exceeded, test failed.")
-		c.Fail()
-		return
-	}
+	// can elect a new leader
+	_ = waitLeaderWithException(c, svrs, oldLeader)
 
 	r.resume(oldLeader)
 
-	timeout = waitCondition(func() bool { return oldLeader.mgr.IsFollower() }, 5*time.Second)
+	timeout := waitCondition(func() bool { return oldLeader.mgr.IsFollower() }, 5*time.Second)
 	if timeout {
 		c.Errorf("old leader should become follower, but not.")
 		c.Fail()
@@ -117,7 +98,7 @@ func (t *T) TestLeaderHoldWillLeadToNewLeaderElected(c *C) {
 	svr2.mgr.Stop()
 }
 
-func (t *T) TestShorterLogHolderCanNeverBeLeader(c *C) {
+func (t *T) TestShorterCommittedLogHolderCanNeverBeLeader(c *C) {
 	r := newRouter()
 
 	svr0 := newSvr(0, 3)
@@ -126,18 +107,12 @@ func (t *T) TestShorterLogHolderCanNeverBeLeader(c *C) {
 	r.register(svr1)
 	svr2 := newSvr(2, 3)
 	r.register(svr2)
+	svrs := []*svr{svr0, svr1, svr2}
 
 	go r.run()
 
 	// wait to election
-	svrs := []*svr{svr0, svr1, svr2}
-	var leader *svr
-	for {
-		if l, ok := getLeader([]*svr{svr0, svr1, svr2}); ok {
-			leader = l
-			break
-		}
-	}
+	leader := waitLeader(c, svrs)
 	followers := getFollowers(svrs)
 
 	// 1. build different log
@@ -146,10 +121,17 @@ func (t *T) TestShorterLogHolderCanNeverBeLeader(c *C) {
 	// follower1 log: (empty)
 	strOfI := strconv.Itoa(999)
 	_ = leader.mgr.Dispatcher.RegisterResp(mgr.Address(strOfI))
+
+	// hold one of followers
+	r.hold(followers[1])
+
+	// run command
 	r.exec(leader, core.Command(strOfI), mgr.Address(strOfI))
 
-	r.hold(followers[0])
-	r.hold(followers[1])
+	// let first entry comitted
+	waitNumOfSvrLogLength(c, svrs, 1, 2)
+
+	// hold leader
 	r.hold(leader)
 
 	// 2. turn all into follower then turn to candidate
@@ -162,23 +144,17 @@ func (t *T) TestShorterLogHolderCanNeverBeLeader(c *C) {
 		}
 	}
 
-	timeout := waitCondition(func() bool { return svr0.mgr.IsCandidate() && svr1.mgr.IsCandidate() && svr2.mgr.IsCandidate() }, 5*time.Second)
-	if timeout {
-		c.Errorf("No server turned to follower before time exceeded, test failed.")
-		c.Fail()
-		return
-	}
+	waitAllBecomeCandidate(c, svrs)
 
 	// 3. resume all to make election (shorter log svr resume first)
-	r.resume(followers[0])
-	r.resume(followers[1])
-	r.resume(leader)
-
-	timeout = waitCondition(func() bool { return leader.mgr.IsLeader() }, 5*time.Second)
-	if timeout {
-		c.Errorf("leader should still be original leader, but not.")
-		c.Fail()
+	for _, svr := range svrs {
+		r.resume(svr)
 	}
+
+	newLeader := waitLeader(c, svrs)
+
+	// the shorter log follower[1] will never become leader
+	c.Assert(newLeader, Not(Equals), followers[1])
 
 	close(r.done)
 	svr0.mgr.Stop()

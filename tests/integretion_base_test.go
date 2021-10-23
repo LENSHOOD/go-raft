@@ -178,10 +178,6 @@ func waitCondition(condition func() bool, timeout time.Duration) (isTimeout bool
 	return false
 }
 
-func getLeader(svrs []*svr) (leader *svr, found bool) {
-	return getLeaderWithException(svrs, nil)
-}
-
 func getLeaderWithException(svrs []*svr, exceptFor *svr) (leader *svr, found bool) {
 	for _, svr := range svrs {
 		if svr != exceptFor && svr.mgr.IsLeader() {
@@ -202,6 +198,21 @@ func getFollowers(svrs []*svr) []*svr {
 	return followers
 }
 
+func waitAllBecomeCandidate(c *C, svrs []*svr) {
+	timeout := waitCondition(func() bool {
+		for _, svr := range svrs {
+			if !svr.mgr.IsCandidate() {
+				return false
+			}
+		}
+		return true
+	}, 30*time.Second)
+	if timeout {
+		c.Errorf("No server turned to follower before time exceeded, test failed.")
+		c.Fail()
+	}
+}
+
 func waitLeader(c *C, svrs []*svr) *svr {
 	return waitLeaderWithException(c, svrs, nil)
 }
@@ -212,7 +223,7 @@ func waitLeaderWithException(c *C, svrs []*svr, exceptFor *svr) *svr {
 		l, ok := getLeaderWithException(svrs, exceptFor)
 		leader = l
 		return ok
-	}, 10*time.Second)
+	}, 30*time.Second)
 	if timeout {
 		c.Errorf("No server turned to leader before time exceeded, test failed.")
 		c.FailNow()
@@ -231,7 +242,7 @@ func waitNumOfSvrLogLength(c *C, svrs []*svr, logLength int, numsOfSvrs int) {
 		}
 
 		return cnt >= numsOfSvrs
-	}, 10*time.Second)
+	}, 30*time.Second)
 	if timeout {
 		c.Errorf("Not enough (need &d) server's log length >= %d before time exceeded, test failed.", numsOfSvrs, logLength)
 		c.FailNow()
