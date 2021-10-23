@@ -44,6 +44,8 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 		}
 
 		switch msg.Payload.(type) {
+		case *AppendEntriesReq:
+			return c.moveState(c.toFollower())
 		case *RequestVoteResp:
 			resp := msg.Payload.(*RequestVoteResp)
 			c.voted[msg.From] = resp.VoteGranted

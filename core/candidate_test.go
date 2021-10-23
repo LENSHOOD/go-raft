@@ -150,6 +150,33 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 	}
 }
 
+func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqCurrentTerm(c *C) {
+	// given
+	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand.currentTerm = 3
+
+	req := Msg{
+		Tp: Rpc,
+		Payload: &AppendEntriesReq{
+			Term:         3,
+			PrevLogTerm:  3,
+			PrevLogIndex: 5,
+			Entries:      []Entry{{Term: 3, Idx: 6, Cmd: ""}},
+		},
+	}
+
+	// when
+	res := cand.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, MoveState)
+	if f, ok := res.Payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (req.Payload.(*AppendEntriesReq)).Term)
+	} else {
+		c.Fail()
+	}
+}
+
 func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	// given
 	cand := NewFollower(commCfg, mockSm).toCandidate()

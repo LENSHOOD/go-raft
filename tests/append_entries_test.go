@@ -154,8 +154,8 @@ func (t *T) TestClusterCanFinallyReachConsistentAfterLeaderAndFollowerHold(c *C)
 	r.exec(leader2, "4", "d")
 	waitNumOfSvrLogLength(c, svrs, 4, 1)
 
-	// resume all followers
-	for _, f := range getFollowers(svrs) {
+	// resume all
+	for _, f := range svrs {
 		r.resume(f)
 	}
 	waitNumOfSvrLogLength(c, svrs, 4, 5)
