@@ -116,18 +116,22 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 		}
 	}
 
+	// only commit & apply entry that belong to current term
+	// (if received previous entry that replicated to majority, then that entry will be committed
+	// right after first current term entry committed)
+	currFollowerMatchedTerm := l.getEntryByIdx(currFollowerMatchedIdx).Term
 	var idSet []Id
 	payloadMap := make(map[Id]interface{})
-	if majorityCnt >= l.cfg.cluster.majorityCnt() {
+	if majorityCnt >= l.cfg.cluster.majorityCnt() && currFollowerMatchedTerm == l.currentTerm{
 		// send resp only if there is a not-yet-response cmd req existed
 		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
+			l.commitIndex = i
+			res := l.applyCmdToStateMachine()
+
 			v, exist := l.clientCtxs[i]
 			if !exist {
 				continue
 			}
-
-			l.commitIndex = i
-			res := l.applyCmdToStateMachine()
 
 			delete(l.clientCtxs, i)
 			idSet = append(idSet, v.clientId)

@@ -291,3 +291,52 @@ func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailu
 		c.Logf("Should get AppendEntriesReq")
 	}
 }
+
+func (t *T) TestLeaderShouldNotCommitIfTheSatisfiedMajorityEntryIsNotAtCurrentTermUntilFirstCurrentTermEntryHasSuccessfullySatisfiedMajority(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 3
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 2, Idx: 2, Cmd: "2"}, {Term: 3, Idx: 3, Cmd: "3"}}
+
+	fid0 := commCfg.cluster.Others[0]
+	l.matchIndex[fid0] = 1
+	l.nextIndex[fid0] = 2
+
+	fid1 := commCfg.cluster.Others[1]
+	l.matchIndex[fid1] = 3
+	l.nextIndex[fid1] = 4
+
+	// when
+	_ = l.TakeAction(Msg{
+		Tp:   Rpc,
+		From: fid0,
+		To:   l.cfg.leader,
+		Payload: &AppendEntriesResp{
+			Term:    3,
+			Success: true,
+		},
+	})
+
+	// then commitIndex not increase
+	c.Assert(l.commitIndex, Equals, Index(1))
+	c.Assert(l.matchIndex[fid0], Equals, Index(2))
+	c.Assert(l.nextIndex[fid0], Equals, Index(3))
+
+	// when
+	_ = l.TakeAction(Msg{
+		Tp:   Rpc,
+		From: fid0,
+		To:   l.cfg.leader,
+		Payload: &AppendEntriesResp{
+			Term:    3,
+			Success: true,
+		},
+	})
+
+	// then commitIndex will directly increase to term-3
+	c.Assert(l.commitIndex, Equals, Index(3))
+	c.Assert(l.matchIndex[fid0], Equals, Index(3))
+	c.Assert(l.nextIndex[fid0], Equals, Index(4))
+}
