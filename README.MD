@@ -9,8 +9,20 @@ Raft is a consensus algorithm that is designed to be easy to understand. It's eq
 
 > [Raft Paper](https://raft.github.io/raft.pdf)
 
-### How to Run?
+### How to?
+1. Run Server
+   
+   `go run run_server.go`
+
+2. Run Client
+
+   `go run client/run_client.go -leader=[leader host]:[port] -cmd=[command]`
 
 ### Architecture
+![](./arch.jpg)
 
 ### Unfinished Features
+- Config Change
+- Log Compaction
+- Log Persistence
+- Long-lived connection of gprc server 
