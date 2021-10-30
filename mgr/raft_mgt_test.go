@@ -318,3 +318,100 @@ func (t *T) TestDispatcherShouldRemoveAllChannelWhenCallClearAll(c *C) {
 
 	close(reqCh)
 }
+
+func (t *T) TestRaftMgrShouldConvertLeaderIdToLeaderAddressWhenReceiveFalseCmdResp(c *C) {
+	// given
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+
+	leaderAddr := mgr.cfg.Others[0]
+	leaderId := mgr.getIdByAddr(leaderAddr)
+	mockObj := new(fakeRaftObject)
+	mockObj.
+		On("TakeAction", mock.Anything).
+		Return(core.Msg{
+			Tp: core.Rpc,
+			Payload: &core.CmdResp{
+				Result:  leaderId,
+				Success: false,
+			}}).
+		Run(func(args mock.Arguments) {
+			msg := args[0].(core.Msg)
+			if msg.Tp == core.Tick {
+				return
+			}
+
+			c.Assert(msg.Tp, Equals, core.Cmd)
+		})
+	mgr.obj = mockObj
+
+	clientAddr := Address("addr")
+	respCh := mgr.Dispatcher.RegisterResp(clientAddr)
+
+	// when
+	cmd := &Rpc{Addr: clientAddr, Payload: &core.CmdReq{}}
+	inputCh <- cmd
+	go mgr.Run()
+	for len(inputCh) != 0 {
+	}
+
+	cmdRespMsg := <-respCh
+
+	// then
+	mockObj.AssertExpectations(c)
+	if cmdResp, ok := cmdRespMsg.Payload.(*core.CmdResp); !ok {
+		c.Fail()
+	} else {
+		c.Assert(cmdResp.Success, Equals, false)
+		c.Assert(cmdResp.Result, Equals, leaderAddr)
+	}
+
+	mgr.Stop()
+}
+
+func (t *T) TestRaftMgrShouldReturnSelfAddressWhenReceiveFalseCmdRespWithInvalidLeaderId(c *C) {
+	// given
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+
+	mockObj := new(fakeRaftObject)
+	mockObj.
+		On("TakeAction", mock.Anything).
+		Return(core.Msg{
+			Tp: core.Rpc,
+			Payload: &core.CmdResp{
+				Result:  core.InvalidId,
+				Success: false,
+			}}).
+		Run(func(args mock.Arguments) {
+			msg := args[0].(core.Msg)
+			if msg.Tp == core.Tick {
+				return
+			}
+
+			c.Assert(msg.Tp, Equals, core.Cmd)
+		})
+	mgr.obj = mockObj
+
+	clientAddr := Address("addr")
+	respCh := mgr.Dispatcher.RegisterResp(clientAddr)
+
+	// when
+	cmd := &Rpc{Addr: clientAddr, Payload: &core.CmdReq{}}
+	inputCh <- cmd
+	go mgr.Run()
+	for len(inputCh) != 0 {
+	}
+
+	cmdRespMsg := <-respCh
+	mgr.Stop()
+
+	// then
+	mockObj.AssertExpectations(c)
+	if cmdResp, ok := cmdRespMsg.Payload.(*core.CmdResp); !ok {
+		c.Fail()
+	} else {
+		c.Assert(cmdResp.Success, Equals, false)
+		c.Assert(cmdResp.Result, Equals, mgr.cfg.Me)
+	}
+}

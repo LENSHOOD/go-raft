@@ -223,6 +223,18 @@ func (m *RaftManager) Run() {
 				m.obj = res.Payload.(core.RaftObject)
 				logger.Printf("[MGR-%s] Role Changed: %T", m.cfg.Me, res.Payload)
 			case core.Rpc:
+				if resp, ok := res.Payload.(*core.CmdResp); ok && !resp.Success{
+					leaderId, _ := resp.Result.(core.Id)
+
+					// if no leader elected yet, return self address to let client give another try
+					addr := m.cfg.Me
+					if leaderAddress, exist := m.getAddrById(leaderId); exist {
+						addr = leaderAddress
+					}
+
+					resp.Result = addr
+				}
+
 				go m.sendTo(res.To, res.Payload)
 			}
 		}

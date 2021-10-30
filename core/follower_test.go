@@ -456,3 +456,26 @@ func (t *T) TestFollowerTriggerElectionTimeoutWithEmptyTick(c *C) {
 		c.Assert(legalElectionTimeout, Equals, true)
 	}
 }
+
+func (t *T) TestFollowerShouldReturnLeaderAddressWhenReceiveCmdRequest(c *C) {
+	// given
+	req := Msg{
+		Tp: Cmd,
+		Payload: &CmdReq{
+			Cmd: "fake-cmd",
+		},
+	}
+
+	f := NewFollower(commCfg, mockSm)
+	f.cfg.leader = Id(1)
+
+	// when
+	res := f.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, Rpc)
+	cmdResp := res.Payload.(*CmdResp)
+	c.Assert(cmdResp.Success, Equals, false)
+	cmdResult := cmdResp.Result.(Id)
+	c.Assert(cmdResult, Equals, f.cfg.leader)
+}

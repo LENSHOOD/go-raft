@@ -32,6 +32,12 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 		case *AppendEntriesReq:
 			return f.Resp(msg.From, f.append(msg.Payload.(*AppendEntriesReq)))
 		}
+	case Cmd:
+		return f.Resp(msg.From,
+			&CmdResp{
+				Result:  f.cfg.leader,
+				Success: false,
+			})
 	}
 
 	// return null for meaningless msg

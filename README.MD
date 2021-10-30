@@ -26,4 +26,4 @@ Raft is a consensus algorithm that is designed to be easy to understand. It's eq
 - [ ] Log Compaction
 - [ ] Log Persistence
 - [ ] Long-lived connection of gprc server 
-- [ ] Redirect to leader when follower received cmd request
+- [x] Redirect to leader when follower received cmd request
