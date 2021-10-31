@@ -14,6 +14,16 @@ func main() {
 	cmd := flag.String("cmd", "", "command to be execute, -cmd=[command content]")
 	flag.Parse()
 
+	callAddr := leaderAddr
+	resp := &api.CmdResponse{Result: "nil-resp"}
+	for resp = sendCmd(callAddr, cmd); !resp.Success; {
+		callAddr = &resp.Result
+	}
+
+	log.Printf("Cmd executed, success: %t, result: %s", resp.Success, resp.Result)
+}
+
+func sendCmd(leaderAddr *string, cmd *string) *api.CmdResponse {
 	conn, err := grpc.Dial(*leaderAddr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
@@ -28,5 +38,5 @@ func main() {
 		log.Fatalf("Error occured: %s", err.Error())
 	}
 
-	log.Printf("Cmd executed, success: %t, result: %s", response.Success, response.Result)
+	return response
 }
