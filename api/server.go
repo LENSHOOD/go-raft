@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/LENSHOOD/go-raft/mgr"
+	otgrpc "github.com/opentracing-contrib/go-grpc"
+	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
 	"log"
@@ -88,7 +90,12 @@ func (c *Caller) Run() {
 }
 
 func (c *Caller) sendReq(rpc *mgr.Rpc) {
-	conn, err := grpc.Dial(string(rpc.Addr), grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(
+		string(rpc.Addr),
+		grpc.WithInsecure(),
+		grpc.WithBlock(),
+		grpc.WithUnaryInterceptor(otgrpc.OpenTracingClientInterceptor(opentracing.GlobalTracer(), otgrpc.LogPayloads())),
+		grpc.WithStreamInterceptor(otgrpc.OpenTracingStreamClientInterceptor(opentracing.GlobalTracer(), otgrpc.LogPayloads())))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}

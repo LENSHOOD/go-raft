@@ -5,6 +5,9 @@ import (
 	"github.com/LENSHOOD/go-raft/api"
 	"github.com/LENSHOOD/go-raft/mgr"
 	"github.com/LENSHOOD/go-raft/state_machine"
+	"github.com/LENSHOOD/go-raft/tracer"
+	otgrpc "github.com/opentracing-contrib/go-grpc"
+	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -33,6 +36,10 @@ func main() {
 		ElectionTimeoutMin:   *eleMin,
 	}
 
+	// tracer
+	tracerCloser := tracer.InitGlobalTracer("raft-server: " + *me)
+	defer tracerCloser.Close()
+
 	// mgr
 	inputCh := make(chan *mgr.Rpc, 10)
 	raftMgr := mgr.NewRaftMgr(config, &state_machine.LogPrintStateMachine{}, inputCh)
@@ -48,7 +55,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	s := grpc.NewServer()
+
+	s := grpc.NewServer(
+		grpc.UnaryInterceptor(otgrpc.OpenTracingServerInterceptor(opentracing.GlobalTracer(), otgrpc.LogPayloads())),
+		grpc.StreamInterceptor(otgrpc.OpenTracingStreamServerInterceptor(opentracing.GlobalTracer(), otgrpc.LogPayloads())),
+	)
 	api.RegisterRaftRpcServer(s, api.NewServer(inputCh, raftMgr))
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
