@@ -1,7 +1,10 @@
 package mgr
 
 import (
+	"context"
 	"github.com/LENSHOOD/go-raft/core"
+	"github.com/opentracing/opentracing-go"
+	opLog "github.com/opentracing/opentracing-go/log"
 	"hash/fnv"
 	"log"
 	"sync"
@@ -13,6 +16,7 @@ var logger = log.Default()
 
 type Address string
 type Rpc struct {
+	Ctx     context.Context
 	Addr    Address
 	Payload interface{}
 }
@@ -22,8 +26,8 @@ type Config struct {
 	Others               []Address
 	TickIntervalMilliSec int64
 	ElectionTimeoutMin   int64
-	ElectionTimeoutMax int64
-	DebugMode          bool
+	ElectionTimeoutMax   int64
+	DebugMode            bool
 }
 
 type addrIdMapper struct {
@@ -113,7 +117,7 @@ func (d *dispatcher) Cancel(addr Address) {
 }
 
 func (d *dispatcher) dispatch(rpc *Rpc) {
-	defer func () {
+	defer func() {
 		if err := recover(); err != nil {
 			logger.Printf("[MGR] failed to dispatch due to panic: %v", err)
 		}
@@ -198,16 +202,21 @@ func (m *RaftManager) Run() {
 	logger.Printf("[MGR-%s] Raft Manager Started.", m.cfg.Me)
 
 	for !m.switcher.isOff() {
+		ctx := context.Background()
 		res := core.NullMsg
 		select {
 		case _ = <-m.ticker.GetTickCh():
 			res = m.obj.(core.RaftObject).TakeAction(core.Msg{Tp: core.Tick})
 		case req := <-m.input:
+			span, spctx := opentracing.StartSpanFromContext(req.Ctx, "mgr-received-rpc")
+			ctx = spctx
+
 			logger.Printf("[MGR-%s] Received from %s: %s", m.cfg.Me, req.Addr, req.Payload)
 			tp := core.Rpc
 			if _, ok := req.Payload.(*core.CmdReq); ok {
 				tp = core.Cmd
 			}
+			span.SetTag("rpc-tp", tp)
 
 			res = m.obj.TakeAction(core.Msg{
 				Tp:      tp,
@@ -215,15 +224,18 @@ func (m *RaftManager) Run() {
 				To:      m.getIdByAddr(m.cfg.Me),
 				Payload: req.Payload,
 			})
+			span.Finish()
 		}
 
 		if res != core.NullMsg {
+			span, spctx := opentracing.StartSpanFromContext(ctx, "mgr-process-raft-result")
 			switch res.Tp {
 			case core.MoveState:
+				span.LogFields(opLog.Object("move-state", res.Payload))
 				m.obj = res.Payload.(core.RaftObject)
 				logger.Printf("[MGR-%s] Role Changed: %T", m.cfg.Me, res.Payload)
 			case core.Rpc:
-				if resp, ok := res.Payload.(*core.CmdResp); ok && !resp.Success{
+				if resp, ok := res.Payload.(*core.CmdResp); ok && !resp.Success {
 					leaderId, _ := resp.Result.(core.Id)
 
 					// if no leader elected yet, return self address to let client give another try
@@ -235,16 +247,18 @@ func (m *RaftManager) Run() {
 					resp.Result = addr
 				}
 
-				go m.sendTo(res.To, res.Payload)
+				span.LogFields(opLog.Object("rpc-respond", res.Payload))
+				go m.sendTo(spctx, res.To, res.Payload)
 			}
+			span.Finish()
 		}
 	}
 }
 
-func (m *RaftManager) sendTo(to core.Id, payload interface{}) {
-	buildRpc := func(to core.Id, payload interface{}) *Rpc {
+func (m *RaftManager) sendTo(ctx context.Context, to core.Id, payload interface{}) {
+	buildRpc := func(ctx context.Context, to core.Id, payload interface{}) *Rpc {
 		if addr, exist := m.getAddrById(to); exist {
-			return &Rpc{addr, payload}
+			return &Rpc{ctx, addr, payload}
 		}
 
 		logger.Fatalf("dest not exist, id: %d", to)
@@ -269,14 +283,14 @@ func (m *RaftManager) sendTo(to core.Id, payload interface{}) {
 	switch to {
 	case core.All:
 		for _, addr := range m.cfg.Others {
-			dispatch(&Rpc{addr, payload})
+			dispatch(&Rpc{ctx, addr, payload})
 		}
 	case core.Composed:
 		for _, msg := range payload.([]core.Msg) {
-			dispatch(buildRpc(msg.To, msg.Payload))
+			dispatch(buildRpc(ctx, msg.To, msg.Payload))
 		}
 	default:
-		dispatch(buildRpc(to, payload))
+		dispatch(buildRpc(ctx, to, payload))
 	}
 }
 

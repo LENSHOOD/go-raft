@@ -49,6 +49,7 @@ func (s *RaftServer) serve(ctx context.Context, inPayload interface{}) (outPaylo
 	addr := mgr.Address(p.Addr.String())
 	outputCh := s.mgr.Dispatcher.RegisterResp(addr)
 	s.inputCh <- &mgr.Rpc{
+		Ctx:     ctx,
 		Addr:    addr,
 		Payload: inPayload,
 	}
@@ -101,7 +102,7 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 	}
 	defer conn.Close()
 
-	ctx, canceled := context.WithDeadline(context.Background(), time.Now().Add(10*time.Millisecond))
+	ctx, canceled := context.WithDeadline(rpc.Ctx, time.Now().Add(10*time.Millisecond))
 	defer canceled()
 
 	var resPayload interface{}
@@ -125,6 +126,7 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 
 	if resPayload != nil {
 		c.outputCh <- &mgr.Rpc{
+			Ctx:     ctx,
 			Addr:    rpc.Addr,
 			Payload: resPayload,
 		}
