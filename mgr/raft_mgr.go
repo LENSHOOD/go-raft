@@ -7,6 +7,7 @@ import (
 	opLog "github.com/opentracing/opentracing-go/log"
 	"hash/fnv"
 	"log"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -207,6 +208,12 @@ func (m *RaftManager) Run() {
 		select {
 		case _ = <-m.ticker.GetTickCh():
 			res = m.obj.(core.RaftObject).TakeAction(core.Msg{Tp: core.Tick})
+			if res != core.NullMsg {
+				span, spctx := opentracing.StartSpanFromContext(ctx, "mgr-meet-interval")
+				span.SetTag("raft-obj", reflect.TypeOf(m.obj))
+				ctx = spctx
+				span.Finish()
+			}
 		case req := <-m.input:
 			span, spctx := opentracing.StartSpanFromContext(req.Ctx, "mgr-received-rpc")
 			ctx = spctx
