@@ -28,3 +28,4 @@ Raft is a consensus algorithm that is designed to be easy to understand. It's eq
 - [ ] Long-lived connection of gprc server 
 - [x] Redirect to leader when follower received cmd request
 - [ ] Error types arrangement
+- [ ] Introduce Cobra to client
