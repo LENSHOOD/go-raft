@@ -126,6 +126,7 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 		// send resp only if there is a not-yet-response cmd req existed
 		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
 			l.commitIndex = i
+			// TODO: do not return to client when config change merge phase committed
 			res := l.applyCmdToStateMachine()
 
 			v, exist := l.clientCtxs[i]

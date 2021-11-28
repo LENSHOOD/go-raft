@@ -479,3 +479,81 @@ func (t *T) TestFollowerShouldReturnLeaderAddressWhenReceiveCmdRequest(c *C) {
 	cmdResult := cmdResp.Result.(Id)
 	c.Assert(cmdResult, Equals, f.cfg.leader)
 }
+
+func (t *T) TestFollowerShouldMergeConfigWhenReceiveConfigChangeLogWithMergePhase(c *C) {
+	// given
+	configChangeCmd := &ConfigChangeCmd{
+		Phase: Merging,
+		Members: []Id{-11203, 190152, 96775, 2344359, 99811, 56867},
+	}
+
+	req := Msg{
+		Tp: Rpc,
+		Payload: &AppendEntriesReq{
+			Term:         2,
+			PrevLogTerm:  2,
+			PrevLogIndex: 3,
+			Entries: []Entry{{Term: 2, Idx: 4, Cmd: configChangeCmd}},
+			LeaderCommit: 3,
+		},
+	}
+
+	f := NewFollower(commCfg, mockSm)
+	f.currentTerm = 2
+
+	// Log (term:idx): 1:1 1:2 2:3
+	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""}, Entry{Term: 1, Idx: 2, Cmd: ""}, Entry{Term: 2, Idx: 3, Cmd: ""})
+
+	// when
+	res := f.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, Rpc)
+	appendResp := res.Payload.(*AppendEntriesResp)
+	c.Assert(appendResp.Term, Equals, Term(2))
+	c.Assert(appendResp.Success, Equals, true)
+	c.Assert(f.log[len(f.log)-1].Cmd, Equals, configChangeCmd)
+
+	// config should be merged
+	c.Assert(f.cfg.cluster.Me, Equals, Id(-11203))
+	c.Assert(f.cfg.cluster.Others, DeepEquals, []Id{190152, -2534, 96775, 2344359, 99811, 56867})
+}
+
+func (t *T) TestFollowerShouldReplaceConfigWhenReceiveConfigChangeLogWithApplyPhase(c *C) {
+	// given
+	configChangeCmd := &ConfigChangeCmd{
+		Phase: ApplyNew,
+		Members: []Id{190152, 96775, 2344359, 99811, 56867},
+	}
+
+	req := Msg{
+		Tp: Rpc,
+		Payload: &AppendEntriesReq{
+			Term:         2,
+			PrevLogTerm:  2,
+			PrevLogIndex: 3,
+			Entries: []Entry{{Term: 2, Idx: 4, Cmd: configChangeCmd}},
+			LeaderCommit: 3,
+		},
+	}
+
+	f := NewFollower(commCfg, mockSm)
+	f.currentTerm = 2
+
+	// Log (term:idx): 1:1 1:2 2:3
+	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""}, Entry{Term: 1, Idx: 2, Cmd: ""}, Entry{Term: 2, Idx: 3, Cmd: ""})
+
+	// when
+	res := f.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, Rpc)
+	appendResp := res.Payload.(*AppendEntriesResp)
+	c.Assert(appendResp.Term, Equals, Term(2))
+	c.Assert(appendResp.Success, Equals, true)
+	c.Assert(f.log[len(f.log)-1].Cmd, Equals, configChangeCmd)
+
+	// config should be merged
+	c.Assert(f.cfg.cluster.Me, Equals, Id(-11203))
+	c.Assert(f.cfg.cluster.Others, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
+}
