@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/LENSHOOD/go-raft/mgr"
 	. "gopkg.in/check.v1"
@@ -137,6 +138,7 @@ func (t *T) TestShorterCommittedLogHolderCanNeverBeLeader(c *C) {
 	// 2. turn all into follower then turn to candidate
 	for _, s := range svrs {
 		s.inputCh <- &mgr.Rpc{
+			Ctx: context.TODO(),
 			Addr: "",
 			Payload: &core.RequestVoteReq{
 				Term: 2,

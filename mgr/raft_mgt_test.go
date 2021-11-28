@@ -1,6 +1,7 @@
 package mgr
 
 import (
+	"context"
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/stretchr/testify/mock"
 	. "gopkg.in/check.v1"
@@ -102,7 +103,7 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 	mgr.obj = mockObj
 
 	// when
-	rpc := &Rpc{Addr: "", Payload: core.RequestVoteReq{Term: 10}}
+	rpc := &Rpc{Ctx: context.TODO(), Addr: "", Payload: core.RequestVoteReq{Term: 10}}
 	inputCh <- rpc
 	go mgr.Run()
 	for len(inputCh) != 0 {
@@ -133,7 +134,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 	// when
 	addr := Address("addr")
 	outputCh := mgr.Dispatcher.RegisterResp(addr)
-	rpc := &Rpc{Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
+	rpc := &Rpc{Ctx: context.TODO(), Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
 	inputCh <- rpc
 	go mgr.Run()
 	for len(inputCh) != 0 {
@@ -162,7 +163,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 
 	// when
 	addr := Address("addr")
-	rpc := &Rpc{Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
+	rpc := &Rpc{Ctx: context.TODO(), Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
 	inputCh <- rpc
 	go mgr.Run()
 	for len(inputCh) != 0 || len(outputCh) == 0 {
@@ -194,7 +195,7 @@ func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 	mgr.obj = mockObj
 
 	// when
-	cmd := &Rpc{Addr: "addr", Payload: &core.CmdReq{}}
+	cmd := &Rpc{Ctx: context.TODO(), Addr: "addr", Payload: &core.CmdReq{}}
 	inputCh <- cmd
 	go mgr.Run()
 	for len(inputCh) != 0 {
@@ -219,7 +220,7 @@ func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMs
 	// when
 	addr := Address("addr")
 	outputCh := mgr.Dispatcher.RegisterResp(addr)
-	cmd := &Rpc{Addr: addr, Payload: &core.CmdReq{}}
+	cmd := &Rpc{Ctx: context.TODO(), Addr: addr, Payload: &core.CmdReq{}}
 	inputCh <- cmd
 	go mgr.Run()
 	for len(inputCh) != 0 {
@@ -240,13 +241,13 @@ func (t *T) TestDispatcherShouldDispatchRespToRelatedChannel(c *C) {
 	d := dispatcher{}
 
 	addr1 := Address("addr1")
-	rpc1 := Rpc{Addr: addr1, Payload: &core.AppendEntriesResp{}}
+	rpc1 := Rpc{Ctx: context.TODO(), Addr: addr1, Payload: &core.AppendEntriesResp{}}
 
 	addr2 := Address("addr1")
-	rpc2 := Rpc{Addr: addr2, Payload: &core.RequestVoteResp{}}
+	rpc2 := Rpc{Ctx: context.TODO(), Addr: addr2, Payload: &core.RequestVoteResp{}}
 
 	addr3 := Address("addr1")
-	rpc3 := Rpc{Addr: addr3, Payload: &core.CmdResp{}}
+	rpc3 := Rpc{Ctx: context.TODO(), Addr: addr3, Payload: &core.CmdResp{}}
 
 	// when
 	assertDispatch := func(addr Address, rpc *Rpc) {
@@ -275,8 +276,8 @@ func (t *T) TestDispatcherShouldDispatchReqToRelatedChannel(c *C) {
 	reqCh := make(chan *Rpc, 3)
 
 	addr := Address("addr")
-	rpc1 := Rpc{Addr: addr, Payload: &core.AppendEntriesReq{}}
-	rpc2 := Rpc{Addr: addr, Payload: &core.RequestVoteReq{}}
+	rpc1 := Rpc{Ctx: context.TODO(), Addr: addr, Payload: &core.AppendEntriesReq{}}
+	rpc2 := Rpc{Ctx: context.TODO(), Addr: addr, Payload: &core.RequestVoteReq{}}
 
 	// when
 	d.RegisterReq(reqCh)
@@ -349,7 +350,7 @@ func (t *T) TestRaftMgrShouldConvertLeaderIdToLeaderAddressWhenReceiveFalseCmdRe
 	respCh := mgr.Dispatcher.RegisterResp(clientAddr)
 
 	// when
-	cmd := &Rpc{Addr: clientAddr, Payload: &core.CmdReq{}}
+	cmd := &Rpc{Ctx: context.TODO(), Addr: clientAddr, Payload: &core.CmdReq{}}
 	inputCh <- cmd
 	go mgr.Run()
 	for len(inputCh) != 0 {
@@ -397,7 +398,7 @@ func (t *T) TestRaftMgrShouldReturnSelfAddressWhenReceiveFalseCmdRespWithInvalid
 	respCh := mgr.Dispatcher.RegisterResp(clientAddr)
 
 	// when
-	cmd := &Rpc{Addr: clientAddr, Payload: &core.CmdReq{}}
+	cmd := &Rpc{Ctx: context.TODO(), Addr: clientAddr, Payload: &core.CmdReq{}}
 	inputCh <- cmd
 	go mgr.Run()
 	for len(inputCh) != 0 {
