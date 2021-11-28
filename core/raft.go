@@ -20,7 +20,7 @@ const InvalidIndex Index = 0
 
 type Term int64
 type Index int64
-type Command string
+type Command interface{}
 
 type Entry struct {
 	Term Term

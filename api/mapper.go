@@ -1,6 +1,18 @@
 package api
 
-import "github.com/LENSHOOD/go-raft/core"
+import (
+	"encoding/json"
+	"github.com/LENSHOOD/go-raft/core"
+)
+
+func cmdMapToStr(cmd core.Command) string {
+	marshal, err := json.Marshal(cmd)
+	if err != nil {
+		return err.Error()
+	}
+
+	return string(marshal)
+}
 
 func mapToRaftEntries(from []*Entry) (to []core.Entry) {
 	if from == nil {
@@ -27,7 +39,7 @@ func mapToApiEntries(from []core.Entry) (to []*Entry) {
 		to = append(to, &Entry {
 			Term: int64(v.Term),
 			Idx: int64(v.Idx),
-			Cmd: string(v.Cmd),
+			Cmd: cmdMapToStr(v.Cmd),
 		})
 	}
 
@@ -150,7 +162,7 @@ func MapToCmdRequest(from *core.CmdReq) (to *CmdRequest) {
 	}
 
 	return &CmdRequest{
-		Cmd: string(from.Cmd),
+		Cmd: cmdMapToStr(from.Cmd),
 	}
 }
 

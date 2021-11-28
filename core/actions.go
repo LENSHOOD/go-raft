@@ -73,3 +73,14 @@ type CmdResp struct {
 	Result interface{}
 	Success bool
 }
+
+type ConfigChangePhase int
+const (
+	Merging ConfigChangePhase = iota
+	ApplyNew
+)
+
+type ConfigChangeCmd struct {
+	Phase ConfigChangePhase
+	Members []Id
+}
