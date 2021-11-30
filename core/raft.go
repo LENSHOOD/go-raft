@@ -42,23 +42,6 @@ func (c *Cluster) majorityCnt() int {
 	return len(c.Others)/2 + 1
 }
 
-func (c *Cluster) mergeWith(newMembers []Id) {
-	OUTER:
-	for _, member := range newMembers {
-		if c.Me == member {
-			continue
-		}
-
-		for _, raw := range c.Others {
-			if raw == member {
-				continue OUTER
-			}
-		}
-
-		c.Others = append(c.Others, member)
-	}
-}
-
 func (c *Cluster) replaceTo(newMembers []Id) {
 	var newOthers []Id
 	for _, member := range newMembers {

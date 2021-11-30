@@ -1,7 +1,5 @@
 package core
 
-import "log"
-
 type Follower struct{ RaftBase }
 
 func NewFollower(cfg Config, sm StateMachine) *Follower {
@@ -154,14 +152,7 @@ func (f *Follower) tryApplyCmd(leaderCommitIdx Index) {
 
 	// do config change no matter this entry has been committed or not
 	if configChangedCmd, ok := lastEntry.Cmd.(*ConfigChangeCmd); ok {
-		switch configChangedCmd.Phase {
-		case Merging:
-			f.cfg.cluster.mergeWith(configChangedCmd.Members)
-		case ApplyNew:
-			f.cfg.cluster.replaceTo(configChangedCmd.Members)
-		default:
-			log.Fatalf("invalid config change phase: %d", configChangedCmd.Phase)
-		}
+		f.cfg.cluster.replaceTo(configChangedCmd.Members)
 	}
 
 	prevCommitted := f.commitIndex
