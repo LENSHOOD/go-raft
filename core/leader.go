@@ -64,8 +64,12 @@ func (l *Leader) sendHeartbeat() Msg {
 }
 
 func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
-	lastEntry := l.getLastEntry()
+	// do config change no matter this entry has been committed or not
+	if configChangedCmd, ok := cmd.(*ConfigChangeCmd); ok {
+		l.cfg.cluster.replaceTo(configChangedCmd.Members)
+	}
 
+	lastEntry := l.getLastEntry()
 	newEntry := Entry{
 		Term: l.currentTerm,
 		Idx:  lastEntry.Idx + 1,

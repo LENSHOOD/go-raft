@@ -340,3 +340,44 @@ func (t *T) TestLeaderShouldNotCommitIfTheSatisfiedMajorityEntryIsNotAtCurrentTe
 	c.Assert(l.matchIndex[fid0], Equals, Index(3))
 	c.Assert(l.nextIndex[fid0], Equals, Index(4))
 }
+
+func (t *T) TestLeaderShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
+
+	configChangeCmd := &ConfigChangeCmd{
+		Members: []Id{190152, 96775, 2344359, 99811, 56867},
+	}
+
+	cmdReqMsg := Msg{
+		Tp:   Cmd,
+		From: Id(999),
+		To:   l.cfg.leader,
+		Payload: &CmdReq{
+			Cmd: configChangeCmd,
+		},
+	}
+
+	// when
+	res := l.TakeAction(cmdReqMsg)
+
+	// then msg
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, All)
+
+	// then payload
+	if appendLogReq, ok := res.Payload.(*AppendEntriesReq); ok {
+		c.Assert(appendLogReq.Entries, DeepEquals, []Entry{{Term: 1, Idx: 3, Cmd: configChangeCmd}})
+	} else {
+		c.Fail()
+		c.Logf("Payload should be AppendEntriesReq")
+	}
+
+	// then client context
+	c.Assert(l.cfg.cluster.Me, Equals, Id(-11203))
+	c.Assert(l.cfg.cluster.Others, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
+}
