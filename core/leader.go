@@ -64,12 +64,20 @@ func (l *Leader) sendHeartbeat() Msg {
 }
 
 func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
+	lastEntry := l.getLastEntry()
+
 	// do config change no matter this entry has been committed or not
 	if configChangedCmd, ok := cmd.(*ConfigChangeCmd); ok {
+		// once any uncommitted config change entry found, then abort current process
+		for i := l.commitIndex + 1; i <= lastEntry.Idx; i++ {
+			if _, exist := l.getEntryByIdx(i).Cmd.(*ConfigChangeCmd); exist {
+				return l.pointReq(from, &CmdResp{Result: nil, Success: false})
+			}
+		}
+
 		l.cfg.cluster.replaceTo(configChangedCmd.Members)
 	}
 
-	lastEntry := l.getLastEntry()
 	newEntry := Entry{
 		Term: l.currentTerm,
 		Idx:  lastEntry.Idx + 1,
@@ -126,7 +134,7 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 	currFollowerMatchedTerm := l.getEntryByIdx(currFollowerMatchedIdx).Term
 	var idSet []Id
 	payloadMap := make(map[Id]interface{})
-	if majorityCnt >= l.cfg.cluster.majorityCnt() && currFollowerMatchedTerm == l.currentTerm{
+	if majorityCnt >= l.cfg.cluster.majorityCnt() && currFollowerMatchedTerm == l.currentTerm {
 		// send resp only if there is a not-yet-response cmd req existed
 		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
 			l.commitIndex = i

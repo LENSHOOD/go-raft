@@ -377,7 +377,51 @@ func (t *T) TestLeaderShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
 		c.Logf("Payload should be AppendEntriesReq")
 	}
 
-	// then client context
+	// config changed
 	c.Assert(l.cfg.cluster.Me, Equals, Id(-11203))
 	c.Assert(l.cfg.cluster.Others, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
+}
+
+func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChangeLogExist(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: &ConfigChangeCmd{
+		Members: []Id{190152, -2534, 96775, 2344359},
+	}}}
+
+	configChangeCmd := &ConfigChangeCmd{
+		Members: []Id{-11203, 190152, 96775, 2344359, 99811, 56867},
+	}
+
+	cmdReqMsg := Msg{
+		Tp:   Cmd,
+		From: Id(999),
+		To:   l.cfg.leader,
+		Payload: &CmdReq{
+			Cmd: configChangeCmd,
+		},
+	}
+
+	// when
+	res := l.TakeAction(cmdReqMsg)
+
+	// then msg
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, cmdReqMsg.From)
+
+	// then payload
+	if cmdResp, ok := res.Payload.(*CmdResp); ok {
+		c.Assert(cmdResp.Success, Equals, false)
+	} else {
+		c.Fail()
+		c.Logf("Payload should be AppendEntriesReq")
+	}
+
+	// no change effected, no entry appended
+	c.Assert(l.cfg.cluster.Me, Equals, Id(-11203))
+	c.Assert(l.cfg.cluster.Others, DeepEquals, []Id{190152, -2534, 96775, 2344359})
+	c.Assert(l.getLastEntry().Idx, Equals, Index(3))
 }
