@@ -492,7 +492,7 @@ func (t *T) TestFollowerShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
 			Term:         2,
 			PrevLogTerm:  2,
 			PrevLogIndex: 3,
-			Entries: []Entry{{Term: 2, Idx: 4, Cmd: configChangeCmd}},
+			Entries:      []Entry{{Term: 2, Idx: 4, Cmd: configChangeCmd}},
 			LeaderCommit: 3,
 		},
 	}
@@ -516,4 +516,45 @@ func (t *T) TestFollowerShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
 	// config should be merged
 	c.Assert(f.cfg.cluster.Me, Equals, Id(-11203))
 	c.Assert(f.cfg.cluster.Others, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
+}
+
+func (t *T) TestFollowerShouldRollbackConfigWhenUncommittedConfigChangeLogOverrideByLeader(c *C) {
+	// given
+	f := NewFollower(commCfg, mockSm)
+	f.cfg.cluster.Others = []Id{-11203, 190152, 96775, 2344359, 99811, 56867}
+	f.currentTerm = 2
+	f.commitIndex = 2
+
+	// Log (term:idx): 1:1 1:2 2:3 2:4--[config change]
+	configChangeCmd := &ConfigChangeCmd{
+		Members:     []Id{-11203, 190152, 96775, 2344359, 99811, 56867},
+		PrevMembers: []Id{-11203, 190152, -2534, 96775, 2344359},
+	}
+	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""}, Entry{Term: 1, Idx: 2, Cmd: ""},
+		Entry{Term: 2, Idx: 3, Cmd: ""}, Entry{Term: 2, Idx: 4, Cmd: configChangeCmd})
+
+	req := Msg{
+		Tp: Rpc,
+		Payload: &AppendEntriesReq{
+			Term:         2,
+			PrevLogTerm:  1,
+			PrevLogIndex: 1,
+			Entries:      []Entry{{Term: 1, Idx: 2, Cmd: ""}, {Term: 2, Idx: 3, Cmd: ""}},
+			LeaderCommit: 3,
+		},
+	}
+
+	// when
+	res := f.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, Rpc)
+	appendResp := res.Payload.(*AppendEntriesResp)
+	c.Assert(appendResp.Term, Equals, Term(2))
+	c.Assert(appendResp.Success, Equals, true)
+	c.Assert(f.log[len(f.log)-1].Idx, Equals, Index(3))
+
+	// config should be rolled back
+	c.Assert(f.cfg.cluster.Me, Equals, Id(-11203))
+	c.Assert(f.cfg.cluster.Others, DeepEquals, []Id{190152, -2534, 96775, 2344359})
 }

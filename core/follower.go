@@ -117,6 +117,15 @@ func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 			replicateBeginPos++
 		}
 
+		// shorter leader logs maybe override UNCOMMITTED config change entry, which should be rollback to previous
+		for i := logPos+1; i < len(f.log); i++ {
+			currEntry := f.log[i]
+			if ccc, ok := currEntry.Cmd.(*ConfigChangeCmd); ok && currEntry.Idx > req.LeaderCommit {
+				f.cfg.cluster.replaceTo(ccc.PrevMembers)
+				break
+			}
+		}
+
 		f.log = append(f.log[:logPos+1], req.Entries[replicateBeginPos:]...)
 	}
 
