@@ -341,7 +341,7 @@ func (t *T) TestLeaderShouldNotCommitIfTheSatisfiedMajorityEntryIsNotAtCurrentTe
 	c.Assert(l.nextIndex[fid0], Equals, Index(4))
 }
 
-func (t *T) TestLeaderShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
+func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigChangeLog(c *C) {
 	// given
 	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
@@ -371,6 +371,7 @@ func (t *T) TestLeaderShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
 
 	// then payload
 	if appendLogReq, ok := res.Payload.(*AppendEntriesReq); ok {
+		c.Assert(configChangeCmd.PrevMembers, DeepEquals, []Id{190152, -2534, 96775, 2344359, -11203})
 		c.Assert(appendLogReq.Entries, DeepEquals, []Entry{{Term: 1, Idx: 3, Cmd: configChangeCmd}})
 	} else {
 		c.Fail()

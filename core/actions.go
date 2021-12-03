@@ -76,4 +76,5 @@ type CmdResp struct {
 
 type ConfigChangeCmd struct {
 	Members []Id
+	PrevMembers []Id
 }
