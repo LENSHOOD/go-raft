@@ -68,7 +68,7 @@ func (t *T) TestFollowerHoldThenLeaderWillNotReturnToCmdUntilFollowerRecover(c *
 	r.exec(leader, "2", "b")
 	r.exec(leader, "3", "c")
 
-	time.Sleep(100*time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
 	// resume all followers
 	for _, f := range getFollowers(svrs) {

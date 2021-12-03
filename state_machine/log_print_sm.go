@@ -8,7 +8,8 @@ import (
 
 var logger = log.Default()
 
-type LogPrintStateMachine struct {}
+type LogPrintStateMachine struct{}
+
 func (l *LogPrintStateMachine) Exec(cmd core.Command) interface{} {
 	logger.Printf("Command Received: %s", cmd)
 	if marshal, err := json.Marshal(cmd); err != nil {

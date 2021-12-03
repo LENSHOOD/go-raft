@@ -76,7 +76,7 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 		}
 
 		// save previous member in case of roll back
-		prevMember := make([]Id, len(l.cfg.cluster.Others) + 1)
+		prevMember := make([]Id, len(l.cfg.cluster.Others)+1)
 		_ = copy(prevMember, append(l.cfg.cluster.Others, l.cfg.cluster.Me))
 		configChangedCmd.PrevMembers = prevMember
 

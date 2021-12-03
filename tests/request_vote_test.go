@@ -138,7 +138,7 @@ func (t *T) TestShorterCommittedLogHolderCanNeverBeLeader(c *C) {
 	// 2. turn all into follower then turn to candidate
 	for _, s := range svrs {
 		s.inputCh <- &mgr.Rpc{
-			Ctx: context.TODO(),
+			Ctx:  context.TODO(),
 			Addr: "",
 			Payload: &core.RequestVoteReq{
 				Term: 2,

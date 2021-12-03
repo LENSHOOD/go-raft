@@ -20,10 +20,10 @@ func mapToRaftEntries(from []*Entry) (to []core.Entry) {
 	}
 
 	for _, v := range from {
-		to = append(to, core.Entry {
+		to = append(to, core.Entry{
 			Term: core.Term(v.Term),
-			Idx: core.Index(v.Idx),
-			Cmd: core.Command(v.Cmd),
+			Idx:  core.Index(v.Idx),
+			Cmd:  core.Command(v.Cmd),
 		})
 	}
 
@@ -36,10 +36,10 @@ func mapToApiEntries(from []core.Entry) (to []*Entry) {
 	}
 
 	for _, v := range from {
-		to = append(to, &Entry {
+		to = append(to, &Entry{
 			Term: int64(v.Term),
-			Idx: int64(v.Idx),
-			Cmd: cmdMapToStr(v.Cmd),
+			Idx:  int64(v.Idx),
+			Cmd:  cmdMapToStr(v.Cmd),
 		})
 	}
 
@@ -93,7 +93,7 @@ func MapToAppendEntriesResults(from *core.AppendEntriesResp) (to *AppendEntriesR
 	}
 
 	return &AppendEntriesResults{
-		Term:        int64(from.Term),
+		Term:    int64(from.Term),
 		Success: from.Success,
 	}
 }

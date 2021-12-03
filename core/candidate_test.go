@@ -182,12 +182,11 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	cand := NewFollower(commCfg, mockSm).toCandidate()
 	cand.currentTerm = 2
 
-
 	// when
 	msg1 := Msg{
 		Tp: Rpc,
 		Payload: &AppendEntriesReq{
-			Term:         1,
+			Term: 1,
 		},
 	}
 	res1 := cand.TakeAction(msg1)
@@ -204,7 +203,7 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	msg3 := Msg{
 		Tp: Rpc,
 		Payload: &RequestVoteReq{
-			Term:        1,
+			Term: 1,
 		},
 	}
 	res3 := cand.TakeAction(msg3)
@@ -235,7 +234,7 @@ func (t *T) TestCandidateTriggerElectionTimeoutWithEmptyTick(c *C) {
 	if rv, ok := res.Payload.(*RequestVoteReq); !ok {
 		c.Fail()
 	} else {
-		c.Assert(rv.Term, Equals, currTerm + 1)
+		c.Assert(rv.Term, Equals, currTerm+1)
 		c.Assert(rv.CandidateId, Equals, cand.cfg.cluster.Me)
 	}
 
@@ -275,9 +274,9 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 	c.Assert(len(cand.voted), Equals, 3)
 	c.Assert(res.Tp, Equals, MoveState)
 	if l, ok := res.Payload.(*Leader); ok {
-		lastLogIndex := cand.log[len(cand.log) - 1].Idx
+		lastLogIndex := cand.log[len(cand.log)-1].Idx
 		for _, v := range cand.cfg.cluster.Others {
-			c.Assert(l.nextIndex[v], Equals, lastLogIndex + 1)
+			c.Assert(l.nextIndex[v], Equals, lastLogIndex+1)
 			c.Assert(l.matchIndex[v], Equals, InvalidIndex)
 		}
 	} else {

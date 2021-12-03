@@ -154,7 +154,7 @@ func (r *router) resume(svr *svr) {
 
 func (r *router) exec(svr *svr, cmd core.Command, clientAddr mgr.Address) {
 	svr.inputCh <- &mgr.Rpc{
-		Ctx: context.TODO(),
+		Ctx:     context.TODO(),
 		Addr:    clientAddr,
 		Payload: &core.CmdReq{Cmd: cmd},
 	}

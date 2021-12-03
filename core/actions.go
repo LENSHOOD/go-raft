@@ -11,7 +11,7 @@ const (
 )
 
 type Msg struct {
-	Tp   MsgType
+	Tp      MsgType
 	From    Id
 	To      Id
 	Payload interface{}
@@ -70,11 +70,11 @@ type CmdReq struct {
 }
 
 type CmdResp struct {
-	Result interface{}
+	Result  interface{}
 	Success bool
 }
 
 type ConfigChangeCmd struct {
-	Members []Id
+	Members     []Id
 	PrevMembers []Id
 }
