@@ -426,3 +426,82 @@ func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChange
 	c.Assert(l.cfg.cluster.Others, DeepEquals, []Id{190152, -2534, 96775, 2344359})
 	c.Assert(l.getLastEntry().Idx, Equals, Index(3))
 }
+
+func (t *T) TestLeaderShouldSendTimeoutNowReqToGivenServerAndToggleInTransferFlagWhenDecideToTransferLeadership(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
+	transferTo := commCfg.cluster.Others[0]
+	l.matchIndex[transferTo] = 2
+
+	// when
+	res, ok := l.transferLeadershipTo(transferTo)
+
+	// then msg
+	c.Assert(ok, Equals, true)
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, transferTo)
+
+	// then payload
+	if resp, ok := res.Payload.(*TimeoutNowReq); ok {
+		c.Assert(resp.Term, Equals, l.currentTerm)
+	} else {
+		c.Fail()
+		c.Logf("Payload should be AppendEntriesReq")
+	}
+
+	// set inTransfer
+	c.Assert(l.inTransfer, Equals, true)
+}
+
+func (t *T) TestLeaderShouldNotSendTimeoutNowReqIfGivenFollowerNotCatchUpWithLog(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
+	transferTo := commCfg.cluster.Others[0]
+	// not catch up with leader
+	l.matchIndex[transferTo] = 1
+
+	// when
+	res, ok := l.transferLeadershipTo(transferTo)
+
+	// then msg
+	c.Assert(ok, Equals, false)
+	c.Assert(res, Equals, NullMsg)
+	c.Assert(l.inTransfer, Equals, false)
+}
+
+func (t *T) TestLeaderShouldRejectAnyCmdIfInTransferFlagIsTrue(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.inTransfer = true
+
+	cmdReqMsg := Msg{
+		Tp:   Cmd,
+		From: Id(999),
+		To:   l.cfg.leader,
+		Payload: &CmdReq{
+			Cmd: "",
+		},
+	}
+
+	// when
+	res := l.TakeAction(cmdReqMsg)
+
+	// then msg
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, cmdReqMsg.From)
+
+	if cmdResp, ok := res.Payload.(*CmdResp); ok {
+		c.Assert(cmdResp.Success, Equals, false)
+	} else {
+		c.Fail()
+		c.Logf("Payload should be AppendEntriesReq")
+	}
+}

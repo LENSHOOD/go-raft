@@ -12,6 +12,7 @@ type Leader struct {
 	clientCtxs           map[Index]clientCtx
 	nextIndex            map[Id]Index
 	matchIndex           map[Id]Index
+	inTransfer           bool
 }
 
 func (l *Leader) TakeAction(msg Msg) Msg {
@@ -64,6 +65,11 @@ func (l *Leader) sendHeartbeat() Msg {
 }
 
 func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
+	if l.inTransfer {
+		// TODO: format result, should not return nil
+		return l.pointReq(from, &CmdResp{Result: nil, Success: false})
+	}
+
 	lastEntry := l.getLastEntry()
 
 	// do config change no matter this entry has been committed or not
@@ -71,6 +77,7 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 		// once any uncommitted config change entry found, then abort current process
 		for i := l.commitIndex + 1; i <= lastEntry.Idx; i++ {
 			if _, exist := l.getEntryByIdx(i).Cmd.(*ConfigChangeCmd); exist {
+				// TODO: format result, should not return nil
 				return l.pointReq(from, &CmdResp{Result: nil, Success: false})
 			}
 		}
@@ -143,7 +150,6 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 		// send resp only if there is a not-yet-response cmd req existed
 		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
 			l.commitIndex = i
-			// TODO: do not return to client when config change merge phase committed
 			res := l.applyCmdToStateMachine()
 
 			v, exist := l.clientCtxs[i]
@@ -194,6 +200,15 @@ func (l *Leader) resendAppendLogWithDecreasedIdx(followerId Id) Msg {
 	})
 }
 
+func (l *Leader) transferLeadershipTo(followerId Id) (msg Msg, eligibleToTransfer bool) {
+	if l.matchIndex[followerId] < l.getLastEntry().Idx {
+		return NullMsg, false
+	}
+
+	l.inTransfer = true
+	return l.pointReq(followerId, &TimeoutNowReq{Term: l.currentTerm}), true
+}
+
 func NewLeader(c *Candidate) *Leader {
 	l := &Leader{
 		RaftBase{
@@ -209,6 +224,7 @@ func NewLeader(c *Candidate) *Leader {
 		make(map[Index]clientCtx),
 		make(map[Id]Index),
 		make(map[Id]Index),
+		false,
 	}
 
 	lastEntry := l.getLastEntry()
