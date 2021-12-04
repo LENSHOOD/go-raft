@@ -448,6 +448,7 @@ func (t *T) TestFollowerTriggerElectionTimeoutWithEmptyTick(c *C) {
 	c.Assert(res.Payload, Not(Equals), f)
 	if candidate, ok := res.Payload.(*Candidate); !ok {
 		c.Fail()
+		c.Logf("Should move to candidate, but payload is %v", candidate)
 	} else {
 		c.Assert(candidate.log, DeepEquals, f.log)
 		c.Assert(candidate.votedFor, Equals, f.cfg.cluster.Me)
@@ -557,4 +558,32 @@ func (t *T) TestFollowerShouldRollbackConfigWhenUncommittedConfigChangeLogOverri
 	// config should be rolled back
 	c.Assert(f.cfg.cluster.Me, Equals, Id(-11203))
 	c.Assert(f.cfg.cluster.Others, DeepEquals, []Id{190152, -2534, 96775, 2344359})
+}
+
+func (t *T) TestFollowerTriggerElectionTimeoutWhenReceiveTimeoutNowRequest(c *C) {
+	// given
+	currTerm := Term(2)
+	req := Msg{
+		Tp: Rpc,
+		Payload: &TimeoutNowReq{Term: currTerm},
+	}
+
+	f := NewFollower(commCfg, mockSm)
+	f.currentTerm = currTerm
+
+	// when
+	res := f.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, MoveState)
+	c.Assert(res.Payload, Not(Equals), f)
+	candidate, ok := res.Payload.(*Candidate)
+	if !ok {
+		c.Fail()
+		c.Logf("Should move to candidate, but payload is %v", candidate)
+	}
+
+	// should start vote and increase term
+	_ = candidate.TakeAction(Msg{Tp: Tick})
+	c.Assert(candidate.currentTerm, Equals, currTerm + 1)
 }

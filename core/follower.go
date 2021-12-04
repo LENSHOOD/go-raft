@@ -31,6 +31,11 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 			return f.Resp(msg.From, f.vote(msg.Payload.(*RequestVoteReq)))
 		case *AppendEntriesReq:
 			return f.Resp(msg.From, f.append(msg.Payload.(*AppendEntriesReq)))
+		case *TimeoutNowReq:
+			if recvTerm < f.currentTerm {
+				return NullMsg
+			}
+			return f.moveState(f.toCandidate())
 		}
 	case Cmd:
 		return f.Resp(msg.From,

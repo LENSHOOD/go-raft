@@ -78,3 +78,11 @@ type ConfigChangeCmd struct {
 	Members     []Id
 	PrevMembers []Id
 }
+
+type TimeoutNowReq struct {
+	Term         Term
+}
+
+func (th *TimeoutNowReq) GetTerm() Term {
+	return th.Term
+}
