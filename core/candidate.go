@@ -6,7 +6,8 @@ import (
 
 type Candidate struct {
 	RaftBase
-	voted map[Id]bool
+	voted          map[Id]bool
+	leaderTransfer bool
 }
 
 func (c *Candidate) TakeAction(msg Msg) Msg {
@@ -29,6 +30,7 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 					CandidateId:  c.cfg.cluster.Me,
 					LastLogIndex: lastEntry.Idx,
 					LastLogTerm:  lastEntry.Term,
+					LeaderTransfer: c.leaderTransfer,
 				})
 		}
 
@@ -81,7 +83,7 @@ func (c *Candidate) toLeader() *Leader {
 	return NewLeader(c)
 }
 
-func NewCandidate(f *Follower) *Candidate {
+func NewCandidate(f *Follower, leaderTransfer bool) *Candidate {
 	c := &Candidate{
 		RaftBase{
 			cfg:         f.cfg,
@@ -93,6 +95,7 @@ func NewCandidate(f *Follower) *Candidate {
 			sm:          f.sm,
 		},
 		make(map[Id]bool),
+		leaderTransfer,
 	}
 
 	// force candidate start election at first tick

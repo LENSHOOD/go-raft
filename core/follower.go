@@ -13,7 +13,7 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 		f.cfg.tickCnt++
 
 		if f.cfg.tickCnt == f.cfg.electionTimeout {
-			return f.moveState(f.toCandidate())
+			return f.moveState(f.toCandidate(false))
 		}
 
 	case Rpc:
@@ -25,7 +25,7 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 			return f.Resp(msg.From, f.append(msg.Payload.(*AppendEntriesReq)))
 		case *TimeoutNowReq:
 			if msg.Payload.(TermHolder).GetTerm() >= f.currentTerm {
-				return f.moveState(f.toCandidate())
+				return f.moveState(f.toCandidate(true))
 			}
 		}
 	case Cmd:
@@ -194,6 +194,6 @@ func (f *Follower) tryApplyCmd(leaderCommitIdx Index) {
 	}
 }
 
-func (f *Follower) toCandidate() *Candidate {
-	return NewCandidate(f)
+func (f *Follower) toCandidate(leaderTransfer bool) *Candidate {
+	return NewCandidate(f, leaderTransfer)
 }

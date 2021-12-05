@@ -47,8 +47,12 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 		if recvTerm < l.currentTerm {
 			return NullMsg
 		} else if recvTerm > l.currentTerm {
+			// ignore vote request except for leader transfer request, to prevent disruptive server
+			if voteReq, ok := msg.Payload.(*RequestVoteReq); ok && !voteReq.LeaderTransfer {
+				return NullMsg
+			}
 			l.currentTerm = recvTerm
-			return l.moveState(l.toFollower(msg.From))
+			return l.moveState(l.toFollower())
 		}
 
 		switch msg.Payload.(type) {
@@ -130,14 +134,14 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 	})
 }
 
-func (l *Leader) toFollower(newLeader Id) *Follower {
+func (l *Leader) toFollower() *Follower {
 	f := NewFollower(l.cfg, l.sm)
 	f.currentTerm = l.currentTerm
 	f.log = l.log
 	f.commitIndex = l.commitIndex
 	f.lastApplied = l.lastApplied
 	f.votedFor = InvalidId
-	f.cfg.leader = newLeader
+	f.cfg.leader = InvalidId
 
 	return f
 }

@@ -181,7 +181,7 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 	}
 }
 
-func (t *T) TestLeaderWillBackToFollowerWhenReceiveAnyRpcWithNewTerm(c *C) {
+func (t *T) TestLeaderWillBackToFollowerWhenReceiveAppendLogRpcWithNewTerm(c *C) {
 	// given
 	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 3
@@ -203,6 +203,53 @@ func (t *T) TestLeaderWillBackToFollowerWhenReceiveAnyRpcWithNewTerm(c *C) {
 	c.Assert(res.Tp, Equals, MoveState)
 	if f, ok := res.Payload.(*Follower); ok {
 		c.Assert(f.currentTerm, Equals, (req.Payload.(*AppendEntriesReq)).Term)
+	} else {
+		c.Fail()
+	}
+}
+
+func (t *T) TestLeaderWillIgnoreNonLeaderTransferRequestVoteRpcWithNewTerm(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 3
+
+	req := Msg{
+		Tp: Rpc,
+		Payload: &RequestVoteReq{
+			Term:           4,
+			CandidateId:    2,
+			LeaderTransfer: false,
+		},
+	}
+
+	// when
+	res := l.TakeAction(req)
+
+	// then
+	c.Assert(res, Equals, NullMsg)
+}
+
+func (t *T) TestLeaderWillBackToFollowerWhenReceiveLeaderTransferRequestVoteRpcWithNewTerm(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 3
+
+	req := Msg{
+		Tp: Rpc,
+		Payload: &RequestVoteReq{
+			Term:           4,
+			CandidateId:    2,
+			LeaderTransfer: true,
+		},
+	}
+
+	// when
+	res := l.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, MoveState)
+	if f, ok := res.Payload.(*Follower); ok {
+		c.Assert(f.currentTerm, Equals, (req.Payload.(*RequestVoteReq)).Term)
 	} else {
 		c.Fail()
 	}
