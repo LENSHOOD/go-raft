@@ -17,6 +17,7 @@ var commCfg = Config{
 		Me:      -11203,
 		Members: []Id{-11203, 190152, -2534, 96775, 2344359},
 	},
+	leader:             InvalidId,
 	electionTimeoutMin: 3,
 	electionTimeoutMax: 10,
 	electionTimeout:    3,

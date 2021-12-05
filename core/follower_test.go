@@ -74,6 +74,57 @@ func (t *T) TestFollowerNotVoteWhenAlreadyVotedToAnother(c *C) {
 	c.Assert(voteResp.VoteGranted, Equals, false)
 }
 
+func (t *T) TestFollowerNotVoteWhenCurrentLeaderExistWithNotLeaderTransferVoteReq(c *C) {
+	// given
+	req := Msg{
+		Tp: Rpc,
+		Payload: &RequestVoteReq{
+			Term:           1,
+			CandidateId:    2,
+			LeaderTransfer: false,
+		},
+	}
+
+	f := NewFollower(commCfg, mockSm)
+	f.cfg.leader = commCfg.cluster.Members[1]
+	f.currentTerm = 1
+
+	// when
+	res := f.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, Rpc)
+	voteResp := res.Payload.(*RequestVoteResp)
+	c.Assert(voteResp.Term, Equals, Term(1))
+	c.Assert(voteResp.VoteGranted, Equals, false)
+}
+
+func (t *T) TestFollowerVoteWithLeaderExistButLeaderTransferReq(c *C) {
+	// given
+	req := Msg{
+		Tp: Rpc,
+		Payload: &RequestVoteReq{
+			Term:           1,
+			CandidateId:    2,
+			LeaderTransfer: true,
+		},
+	}
+
+	f := NewFollower(commCfg, mockSm)
+	f.cfg.leader = commCfg.cluster.Members[1]
+	f.currentTerm = 1
+
+	// when
+	res := f.TakeAction(req)
+
+	// then
+	c.Assert(res.Tp, Equals, Rpc)
+	voteResp := res.Payload.(*RequestVoteResp)
+	c.Assert(voteResp.Term, Equals, Term(1))
+	c.Assert(voteResp.VoteGranted, Equals, true)
+	c.Assert(f.votedFor, Equals, Id(2))
+}
+
 func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 	// given
 	req := Msg{
@@ -160,7 +211,8 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 	req := Msg{
 		Tp: Rpc,
 		Payload: &AppendEntriesReq{
-			Term: 1,
+			Term:     1,
+			LeaderId: commCfg.cluster.Members[1],
 		},
 	}
 
@@ -175,6 +227,7 @@ func (t *T) TestFollowerNotAppendLogWhenLeaderTermLessThanCurrTerm(c *C) {
 	appendResp := res.Payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(2))
 	c.Assert(appendResp.Success, Equals, false)
+	c.Assert(f.cfg.leader, Equals, InvalidId)
 }
 
 func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
@@ -185,6 +238,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 			Term:         4,
 			PrevLogTerm:  2,
 			PrevLogIndex: 2,
+			LeaderId:     commCfg.cluster.Members[1],
 		},
 	}
 
@@ -204,6 +258,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermNotMatch(c *C) {
 	appendResp := res.Payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, false)
+	c.Assert(f.cfg.leader, Equals, commCfg.cluster.Members[1])
 }
 
 func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) {
@@ -214,6 +269,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 			Term:         4,
 			PrevLogTerm:  3,
 			PrevLogIndex: 5,
+			LeaderId:     commCfg.cluster.Members[1],
 		},
 	}
 
@@ -233,6 +289,7 @@ func (t *T) TestFollowerNotAppendLogWhenPrevTermMatchButPrevIndexNotMatch(c *C) 
 	appendResp := res.Payload.(*AppendEntriesResp)
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, false)
+	c.Assert(f.cfg.leader, Equals, commCfg.cluster.Members[1])
 }
 
 func (t *T) TestFollowerReturnTrueButNotAppendLogWhenReceiveHeartbeatMsg(c *C) {
@@ -244,6 +301,7 @@ func (t *T) TestFollowerReturnTrueButNotAppendLogWhenReceiveHeartbeatMsg(c *C) {
 			PrevLogTerm:  4,
 			PrevLogIndex: 5,
 			Entries:      []Entry{},
+			LeaderId:     commCfg.cluster.Members[1],
 		},
 	}
 
@@ -265,6 +323,7 @@ func (t *T) TestFollowerReturnTrueButNotAppendLogWhenReceiveHeartbeatMsg(c *C) {
 	c.Assert(appendResp.Term, Equals, Term(4))
 	c.Assert(appendResp.Success, Equals, true)
 	c.Assert(f.log, DeepEquals, originalLog)
+	c.Assert(f.cfg.leader, Equals, commCfg.cluster.Members[1])
 }
 
 func (t *T) TestFollowerShouldApplyCmdWhenReceiveHeartbeatMsgContainsNewCommittedIdx(c *C) {

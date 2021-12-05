@@ -18,24 +18,15 @@ func (f *Follower) TakeAction(msg Msg) Msg {
 
 	case Rpc:
 		f.cfg.tickCnt = 0
-
-		recvTerm := msg.Payload.(TermHolder).GetTerm()
-		// update term and clear vote when receive newer term
-		if recvTerm > f.currentTerm {
-			f.currentTerm = recvTerm
-			f.votedFor = InvalidId
-		}
-
 		switch msg.Payload.(type) {
 		case *RequestVoteReq:
 			return f.Resp(msg.From, f.vote(msg.Payload.(*RequestVoteReq)))
 		case *AppendEntriesReq:
 			return f.Resp(msg.From, f.append(msg.Payload.(*AppendEntriesReq)))
 		case *TimeoutNowReq:
-			if recvTerm < f.currentTerm {
-				return NullMsg
+			if msg.Payload.(TermHolder).GetTerm() >= f.currentTerm {
+				return f.moveState(f.toCandidate())
 			}
-			return f.moveState(f.toCandidate())
 		}
 	case Cmd:
 		return f.Resp(msg.From,
@@ -64,6 +55,17 @@ func (f *Follower) vote(req *RequestVoteReq) *RequestVoteResp {
 
 	if req.Term < f.currentTerm {
 		return buildResp(false)
+	}
+
+	// ignore vote request when leader exist, to prevent disruptive server (only if it's a leader transfer request)
+	if f.cfg.leader != InvalidId && !req.LeaderTransfer {
+		return buildResp(false)
+	}
+
+	// update term and clear vote when receive newer term
+	if req.Term > f.currentTerm {
+		f.currentTerm = req.Term
+		f.votedFor = InvalidId
 	}
 
 	if f.votedFor != InvalidId && f.votedFor != req.CandidateId {
@@ -105,6 +107,13 @@ func (f *Follower) append(req *AppendEntriesReq) *AppendEntriesResp {
 		return buildResp(false)
 	}
 
+	// update term and clear vote when receive newer term
+	if req.Term > f.currentTerm {
+		f.currentTerm = req.Term
+		f.votedFor = InvalidId
+	}
+
+	f.cfg.leader = req.LeaderId
 	matched, logPos := matchPrev(f.log, req.PrevLogTerm, req.PrevLogIndex)
 	if !matched {
 		return buildResp(false)

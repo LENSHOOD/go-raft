@@ -24,10 +24,11 @@ type TermHolder interface {
 }
 
 type RequestVoteReq struct {
-	Term         Term
-	CandidateId  Id
-	LastLogIndex Index
-	LastLogTerm  Term
+	Term           Term
+	CandidateId    Id
+	LastLogIndex   Index
+	LastLogTerm    Term
+	LeaderTransfer bool
 }
 
 func (th *RequestVoteReq) GetTerm() Term {

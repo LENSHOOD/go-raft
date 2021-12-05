@@ -35,7 +35,6 @@ type RaftObject interface {
 
 type Cluster struct {
 	Me      Id
-	Others  []Id
 	Members []Id
 }
 
