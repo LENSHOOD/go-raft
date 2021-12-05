@@ -349,8 +349,9 @@ func NewRaftMgrWithTicker(cfg Config, sm core.StateMachine, inputCh chan *Rpc, t
 	cls := core.Cluster{
 		Me: mgr.getIdByAddr(cfg.Me),
 	}
+	cls.Members = append(cls.Members, cls.Me)
 	for _, addr := range cfg.Others {
-		cls.Others = append(cls.Others, mgr.getIdByAddr(addr))
+		cls.Members = append(cls.Members, mgr.getIdByAddr(addr))
 	}
 
 	if ticker == nil {

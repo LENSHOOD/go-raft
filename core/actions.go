@@ -80,7 +80,7 @@ type ConfigChangeCmd struct {
 }
 
 type TimeoutNowReq struct {
-	Term         Term
+	Term Term
 }
 
 func (th *TimeoutNowReq) GetTerm() Term {

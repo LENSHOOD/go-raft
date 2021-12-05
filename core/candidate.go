@@ -51,14 +51,13 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			c.voted[msg.From] = resp.VoteGranted
 
 			voteCnt := 0
-			for _, v := range c.cfg.cluster.Others {
-				if c.voted[v] {
+			for _, v := range c.voted {
+				if v {
 					voteCnt++
 				}
 			}
 
-			majorityCnt := (len(c.cfg.cluster.Others)+1)/2 + 1
-			if voteCnt+1 >= majorityCnt {
+			if c.cfg.cluster.meetMajority(voteCnt) {
 				return c.moveState(c.toLeader())
 			}
 		}
@@ -101,7 +100,6 @@ func NewCandidate(f *Follower) *Candidate {
 
 	// vote self
 	c.votedFor = c.cfg.cluster.Me
-	c.voted[c.cfg.cluster.Me] = true
 
 	return c
 }

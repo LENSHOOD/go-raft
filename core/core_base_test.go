@@ -14,8 +14,8 @@ var _ = Suite(&T{})
 
 var commCfg = Config{
 	cluster: Cluster{
-		Me:     -11203,
-		Others: []Id{190152, -2534, 96775, 2344359},
+		Me:      -11203,
+		Members: []Id{-11203, 190152, -2534, 96775, 2344359},
 	},
 	electionTimeoutMin: 3,
 	electionTimeoutMax: 10,

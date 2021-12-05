@@ -80,12 +80,12 @@ func (t *T) TestLeaderShouldIncrementMatchIndexToLastIdxWhenReceiveSuccessRespFr
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
 
-	l.matchIndex[commCfg.cluster.Others[1]] = 0
-	l.nextIndex[commCfg.cluster.Others[1]] = 1
+	l.matchIndex[commCfg.cluster.Members[1]] = 0
+	l.nextIndex[commCfg.cluster.Members[1]] = 1
 
 	resp := Msg{
 		Tp:   Rpc,
-		From: commCfg.cluster.Others[1],
+		From: commCfg.cluster.Members[1],
 		To:   l.cfg.leader,
 		Payload: &AppendEntriesResp{
 			Term:    1,
@@ -99,15 +99,15 @@ func (t *T) TestLeaderShouldIncrementMatchIndexToLastIdxWhenReceiveSuccessRespFr
 	}
 
 	// then
-	c.Assert(l.matchIndex[commCfg.cluster.Others[1]], Equals, Index(3))
-	c.Assert(l.nextIndex[commCfg.cluster.Others[1]], Equals, Index(4))
+	c.Assert(l.matchIndex[commCfg.cluster.Members[1]], Equals, Index(3))
+	c.Assert(l.nextIndex[commCfg.cluster.Members[1]], Equals, Index(4))
 
 	// when after that, matchIndex and nextIndex stayed
 	_ = l.TakeAction(resp)
 
 	// then
-	c.Assert(l.matchIndex[commCfg.cluster.Others[1]], Equals, Index(3))
-	c.Assert(l.nextIndex[commCfg.cluster.Others[1]], Equals, Index(4))
+	c.Assert(l.matchIndex[commCfg.cluster.Members[1]], Equals, Index(3))
+	c.Assert(l.nextIndex[commCfg.cluster.Members[1]], Equals, Index(4))
 }
 
 func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiveMajoritySuccesses(c *C) {
@@ -118,14 +118,14 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
 
-	l.matchIndex[commCfg.cluster.Others[0]] = 1
-	l.nextIndex[commCfg.cluster.Others[0]] = 2
-	l.matchIndex[commCfg.cluster.Others[1]] = 1
-	l.nextIndex[commCfg.cluster.Others[1]] = 2
-	l.matchIndex[commCfg.cluster.Others[2]] = 0
-	l.nextIndex[commCfg.cluster.Others[2]] = 1
-	l.matchIndex[commCfg.cluster.Others[3]] = 1
-	l.nextIndex[commCfg.cluster.Others[3]] = 2
+	l.matchIndex[commCfg.cluster.Members[1]] = 1
+	l.nextIndex[commCfg.cluster.Members[1]] = 2
+	l.matchIndex[commCfg.cluster.Members[2]] = 1
+	l.nextIndex[commCfg.cluster.Members[2]] = 2
+	l.matchIndex[commCfg.cluster.Members[3]] = 0
+	l.nextIndex[commCfg.cluster.Members[3]] = 1
+	l.matchIndex[commCfg.cluster.Members[4]] = 1
+	l.nextIndex[commCfg.cluster.Members[4]] = 2
 	l.clientCtxs[Index(2)] = clientCtx{clientId: Id(999)}
 	l.clientCtxs[Index(3)] = clientCtx{clientId: Id(999)}
 
@@ -142,20 +142,20 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 	}
 
 	// when
-	res1 := l.TakeAction(buildResp(commCfg.cluster.Others[0]))
-	res2 := l.TakeAction(buildResp(commCfg.cluster.Others[1]))
-	_ = l.TakeAction(buildResp(commCfg.cluster.Others[0]))
-	_ = l.TakeAction(buildResp(commCfg.cluster.Others[1]))
+	res1 := l.TakeAction(buildResp(commCfg.cluster.Members[1]))
+	res2 := l.TakeAction(buildResp(commCfg.cluster.Members[2]))
+	_ = l.TakeAction(buildResp(commCfg.cluster.Members[1]))
+	_ = l.TakeAction(buildResp(commCfg.cluster.Members[2]))
 
 	// then
-	c.Assert(l.matchIndex[commCfg.cluster.Others[0]], Equals, Index(3))
-	c.Assert(l.nextIndex[commCfg.cluster.Others[0]], Equals, Index(4))
-	c.Assert(l.matchIndex[commCfg.cluster.Others[1]], Equals, Index(3))
-	c.Assert(l.nextIndex[commCfg.cluster.Others[1]], Equals, Index(4))
-	c.Assert(l.matchIndex[commCfg.cluster.Others[2]], Equals, Index(0))
-	c.Assert(l.nextIndex[commCfg.cluster.Others[2]], Equals, Index(1))
-	c.Assert(l.matchIndex[commCfg.cluster.Others[3]], Equals, Index(1))
-	c.Assert(l.nextIndex[commCfg.cluster.Others[3]], Equals, Index(2))
+	c.Assert(l.matchIndex[commCfg.cluster.Members[1]], Equals, Index(3))
+	c.Assert(l.nextIndex[commCfg.cluster.Members[1]], Equals, Index(4))
+	c.Assert(l.matchIndex[commCfg.cluster.Members[2]], Equals, Index(3))
+	c.Assert(l.nextIndex[commCfg.cluster.Members[2]], Equals, Index(4))
+	c.Assert(l.matchIndex[commCfg.cluster.Members[3]], Equals, Index(0))
+	c.Assert(l.nextIndex[commCfg.cluster.Members[3]], Equals, Index(1))
+	c.Assert(l.matchIndex[commCfg.cluster.Members[4]], Equals, Index(1))
+	c.Assert(l.nextIndex[commCfg.cluster.Members[4]], Equals, Index(2))
 
 	c.Assert(res1, Equals, NullMsg)
 	if msgs, ok := res2.Payload.([]Msg); ok {
@@ -216,7 +216,7 @@ func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
 
-	fid := commCfg.cluster.Others[1]
+	fid := commCfg.cluster.Members[1]
 	l.nextIndex[fid] = 4
 
 	resp := Msg{
@@ -257,7 +257,7 @@ func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailu
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: "3"}}
 
-	fid := commCfg.cluster.Others[1]
+	fid := commCfg.cluster.Members[1]
 	l.nextIndex[fid] = 4
 
 	resp := Msg{
@@ -300,11 +300,11 @@ func (t *T) TestLeaderShouldNotCommitIfTheSatisfiedMajorityEntryIsNotAtCurrentTe
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 2, Idx: 2, Cmd: "2"}, {Term: 3, Idx: 3, Cmd: "3"}}
 
-	fid0 := commCfg.cluster.Others[0]
+	fid0 := commCfg.cluster.Members[1]
 	l.matchIndex[fid0] = 1
 	l.nextIndex[fid0] = 2
 
-	fid1 := commCfg.cluster.Others[1]
+	fid1 := commCfg.cluster.Members[2]
 	l.matchIndex[fid1] = 3
 	l.nextIndex[fid1] = 4
 
@@ -371,7 +371,7 @@ func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigC
 
 	// then payload
 	if appendLogReq, ok := res.Payload.(*AppendEntriesReq); ok {
-		c.Assert(configChangeCmd.PrevMembers, DeepEquals, []Id{190152, -2534, 96775, 2344359, -11203})
+		c.Assert(configChangeCmd.PrevMembers, DeepEquals, []Id{-11203, 190152, -2534, 96775, 2344359})
 		c.Assert(appendLogReq.Entries, DeepEquals, []Entry{{Term: 1, Idx: 3, Cmd: configChangeCmd}})
 	} else {
 		c.Fail()
@@ -380,7 +380,7 @@ func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigC
 
 	// config changed
 	c.Assert(l.cfg.cluster.Me, Equals, Id(-11203))
-	c.Assert(l.cfg.cluster.Others, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
+	c.Assert(l.cfg.cluster.Members, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
 }
 
 func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChangeLogExist(c *C) {
@@ -390,11 +390,11 @@ func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChange
 	l.commitIndex = 1
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: &ConfigChangeCmd{
-		Members: []Id{190152, -2534, 96775, 2344359},
+		Members: []Id{-11203, 190152, -2534, 96775, 2344359},
 	}}}
 
 	configChangeCmd := &ConfigChangeCmd{
-		Members: []Id{-11203, 190152, 96775, 2344359, 99811, 56867},
+		Members: []Id{-11203, 190152, -2534, 96775, 2344359, 56867},
 	}
 
 	cmdReqMsg := Msg{
@@ -423,7 +423,7 @@ func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChange
 
 	// no change effected, no entry appended
 	c.Assert(l.cfg.cluster.Me, Equals, Id(-11203))
-	c.Assert(l.cfg.cluster.Others, DeepEquals, []Id{190152, -2534, 96775, 2344359})
+	c.Assert(l.cfg.cluster.Members, DeepEquals, []Id{-11203, 190152, -2534, 96775, 2344359})
 	c.Assert(l.getLastEntry().Idx, Equals, Index(3))
 }
 
@@ -434,7 +434,7 @@ func (t *T) TestLeaderShouldSendTimeoutNowReqToGivenServerAndToggleInTransferFla
 	l.commitIndex = 1
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
-	transferTo := commCfg.cluster.Others[0]
+	transferTo := commCfg.cluster.Members[1]
 	l.matchIndex[transferTo] = 2
 
 	// when
@@ -452,9 +452,6 @@ func (t *T) TestLeaderShouldSendTimeoutNowReqToGivenServerAndToggleInTransferFla
 		c.Fail()
 		c.Logf("Payload should be AppendEntriesReq")
 	}
-
-	// set inTransfer
-	c.Assert(l.inTransfer, Equals, true)
 }
 
 func (t *T) TestLeaderShouldNotSendTimeoutNowReqIfGivenFollowerNotCatchUpWithLog(c *C) {
@@ -464,7 +461,7 @@ func (t *T) TestLeaderShouldNotSendTimeoutNowReqIfGivenFollowerNotCatchUpWithLog
 	l.commitIndex = 1
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
-	transferTo := commCfg.cluster.Others[0]
+	transferTo := commCfg.cluster.Members[1]
 	// not catch up with leader
 	l.matchIndex[transferTo] = 1
 
@@ -510,16 +507,11 @@ func (t *T) TestLeaderShouldClearInTransferFlagAndGoBackToLeaderIfElectionTimeou
 	// given
 	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
-	transferTo := commCfg.cluster.Others[0]
+	transferTo := commCfg.cluster.Members[1]
 	l.matchIndex[transferTo] = 2
 
-	// when
-	_, _ = l.transferLeadershipTo(transferTo)
-
-	// then
-	c.Assert(l.inTransfer, Equals, true)
-
 	// when election timeout
+	l.inTransfer = true
 	for i := int64(0); i < l.cfg.electionTimeout; i++ {
 		_ = l.TakeAction(Msg{Tp: Tick})
 	}

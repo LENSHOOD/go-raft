@@ -91,9 +91,8 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 		}
 
 		// save previous member in case of roll back
-		prevMember := make([]Id, len(l.cfg.cluster.Others)+1)
-		_ = copy(prevMember, append(l.cfg.cluster.Others, l.cfg.cluster.Me))
-		configChangedCmd.PrevMembers = prevMember
+		configChangedCmd.PrevMembers = make([]Id, len(l.cfg.cluster.Members))
+		_ = copy(configChangedCmd.PrevMembers, l.cfg.cluster.Members)
 
 		l.cfg.cluster.replaceTo(configChangedCmd.Members)
 	}
@@ -141,7 +140,7 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 	l.nextIndex[msg.From] = l.matchIndex[msg.From] + 1
 	currFollowerMatchedIdx := l.matchIndex[msg.From]
 
-	majorityCnt := 1
+	majorityCnt := 0
 	for _, v := range l.matchIndex {
 		if v >= currFollowerMatchedIdx {
 			majorityCnt++
@@ -154,7 +153,7 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 	currFollowerMatchedTerm := l.getEntryByIdx(currFollowerMatchedIdx).Term
 	var idSet []Id
 	payloadMap := make(map[Id]interface{})
-	if majorityCnt >= l.cfg.cluster.majorityCnt() && currFollowerMatchedTerm == l.currentTerm {
+	if l.cfg.cluster.meetMajority(majorityCnt) && currFollowerMatchedTerm == l.currentTerm {
 		// send resp only if there is a not-yet-response cmd req existed
 		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
 			l.commitIndex = i
@@ -213,7 +212,6 @@ func (l *Leader) transferLeadershipTo(followerId Id) (msg Msg, eligibleToTransfe
 		return NullMsg, false
 	}
 
-	l.inTransfer = true
 	return l.pointReq(followerId, &TimeoutNowReq{Term: l.currentTerm}), true
 }
 
@@ -236,7 +234,11 @@ func NewLeader(c *Candidate) *Leader {
 	}
 
 	lastEntry := l.getLastEntry()
-	for _, v := range l.cfg.cluster.Others {
+	for _, v := range l.cfg.cluster.Members {
+		if v == l.cfg.cluster.Me {
+			continue
+		}
+
 		// next idx should be the last valid id +1
 		l.nextIndex[v] = lastEntry.Idx + 1
 		l.matchIndex[v] = InvalidIndex

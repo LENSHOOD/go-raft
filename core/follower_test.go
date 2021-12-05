@@ -516,13 +516,13 @@ func (t *T) TestFollowerShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
 
 	// config should be merged
 	c.Assert(f.cfg.cluster.Me, Equals, Id(-11203))
-	c.Assert(f.cfg.cluster.Others, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
+	c.Assert(f.cfg.cluster.Members, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
 }
 
 func (t *T) TestFollowerShouldRollbackConfigWhenUncommittedConfigChangeLogOverrideByLeader(c *C) {
 	// given
 	f := NewFollower(commCfg, mockSm)
-	f.cfg.cluster.Others = []Id{-11203, 190152, 96775, 2344359, 99811, 56867}
+	f.cfg.cluster.Members = []Id{-11203, 190152, 96775, 2344359, 99811, 56867}
 	f.currentTerm = 2
 	f.commitIndex = 2
 
@@ -557,14 +557,14 @@ func (t *T) TestFollowerShouldRollbackConfigWhenUncommittedConfigChangeLogOverri
 
 	// config should be rolled back
 	c.Assert(f.cfg.cluster.Me, Equals, Id(-11203))
-	c.Assert(f.cfg.cluster.Others, DeepEquals, []Id{190152, -2534, 96775, 2344359})
+	c.Assert(f.cfg.cluster.Members, DeepEquals, []Id{-11203, 190152, -2534, 96775, 2344359})
 }
 
 func (t *T) TestFollowerTriggerElectionTimeoutWhenReceiveTimeoutNowRequest(c *C) {
 	// given
 	currTerm := Term(2)
 	req := Msg{
-		Tp: Rpc,
+		Tp:      Rpc,
 		Payload: &TimeoutNowReq{Term: currTerm},
 	}
 
@@ -585,5 +585,5 @@ func (t *T) TestFollowerTriggerElectionTimeoutWhenReceiveTimeoutNowRequest(c *C)
 
 	// should start vote and increase term
 	_ = candidate.TakeAction(Msg{Tp: Tick})
-	c.Assert(candidate.currentTerm, Equals, currTerm + 1)
+	c.Assert(candidate.currentTerm, Equals, currTerm+1)
 }

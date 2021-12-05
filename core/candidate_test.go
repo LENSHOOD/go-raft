@@ -33,13 +33,12 @@ func (t *T) TestCandidateCanStartElection(c *C) {
 
 	// self vote
 	c.Assert(cand.votedFor, Equals, cand.cfg.cluster.Me)
-	c.Assert(cand.voted[cand.cfg.cluster.Me], Equals, true)
 }
 
 func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 	// given
-	voteFollowerId0 := commCfg.cluster.Others[1]
-	voteFollowerId1 := commCfg.cluster.Others[3]
+	voteFollowerId0 := commCfg.cluster.Members[1]
+	voteFollowerId1 := commCfg.cluster.Members[3]
 
 	cand := NewFollower(commCfg, mockSm).toCandidate()
 	cand.currentTerm = 1
@@ -63,17 +62,16 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 	// then
 	c.Assert(cand.voted[voteFollowerId0], Equals, true)
 	c.Assert(cand.voted[voteFollowerId1], Equals, true)
-	c.Assert(cand.voted[cand.cfg.cluster.Me], Equals, true)
 
-	c.Assert(cand.voted[commCfg.cluster.Others[0]], Equals, false)
-	c.Assert(cand.voted[commCfg.cluster.Others[2]], Equals, false)
+	c.Assert(cand.voted[commCfg.cluster.Members[2]], Equals, false)
+	c.Assert(cand.voted[commCfg.cluster.Members[4]], Equals, false)
 }
 
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 	// given
 	cand := NewFollower(commCfg, mockSm).toCandidate()
 
-	voteFollowerId0 := commCfg.cluster.Others[1]
+	voteFollowerId0 := commCfg.cluster.Members[1]
 	resp := Msg{
 		Tp:   Rpc,
 		From: voteFollowerId0,
@@ -100,7 +98,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
 	// given
 	cand := NewFollower(commCfg, mockSm).toCandidate()
 
-	newCandidate := commCfg.cluster.Others[1]
+	newCandidate := commCfg.cluster.Members[1]
 	resp := Msg{
 		Tp:   Rpc,
 		From: newCandidate,
@@ -245,8 +243,8 @@ func (t *T) TestCandidateTriggerElectionTimeoutWithEmptyTick(c *C) {
 
 func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 	// given
-	voteFollowerId0 := commCfg.cluster.Others[1]
-	voteFollowerId1 := commCfg.cluster.Others[3]
+	voteFollowerId0 := commCfg.cluster.Members[1]
+	voteFollowerId1 := commCfg.cluster.Members[3]
 
 	cand := NewFollower(commCfg, mockSm).toCandidate()
 	cand.currentTerm = 3
@@ -271,11 +269,14 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 	res := cand.TakeAction(buildResp(voteFollowerId1))
 
 	// then
-	c.Assert(len(cand.voted), Equals, 3)
+	c.Assert(len(cand.voted), Equals, 2)
 	c.Assert(res.Tp, Equals, MoveState)
 	if l, ok := res.Payload.(*Leader); ok {
 		lastLogIndex := cand.log[len(cand.log)-1].Idx
-		for _, v := range cand.cfg.cluster.Others {
+		for _, v := range cand.cfg.cluster.Members {
+			if v == cand.cfg.cluster.Me {
+				continue
+			}
 			c.Assert(l.nextIndex[v], Equals, lastLogIndex+1)
 			c.Assert(l.matchIndex[v], Equals, InvalidIndex)
 		}

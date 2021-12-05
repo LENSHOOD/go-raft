@@ -34,24 +34,30 @@ type RaftObject interface {
 }
 
 type Cluster struct {
-	Me     Id
-	Others []Id
+	Me      Id
+	Others  []Id
+	Members []Id
 }
 
-func (c *Cluster) majorityCnt() int {
-	return len(c.Others)/2 + 1
+// meetMajority check whether the given cnt is meet majority count
+// 1. if current server is the cluster member (included in the Members)
+//    return (cnt + 1 >= majority count)
+// 2. else the current server not the cluster member (config change may remove the current leader from cluster)
+//    return (cnt >= majority count)
+func (c *Cluster) meetMajority(cnt int) bool {
+	realCount := cnt
+	for _, member := range c.Members {
+		if member == c.Me {
+			realCount++
+			break
+		}
+	}
+
+	return realCount >= len(c.Members)/2+1
 }
 
 func (c *Cluster) replaceTo(newMembers []Id) {
-	var newOthers []Id
-	for _, member := range newMembers {
-		if c.Me == member {
-			continue
-		}
-		newOthers = append(newOthers, member)
-	}
-
-	c.Others = newOthers
+	c.Members = newMembers
 }
 
 type Config struct {
