@@ -505,3 +505,26 @@ func (t *T) TestLeaderShouldRejectAnyCmdIfInTransferFlagIsTrue(c *C) {
 		c.Logf("Payload should be AppendEntriesReq")
 	}
 }
+
+func (t *T) TestLeaderShouldClearInTransferFlagAndGoBackToLeaderIfElectionTimeoutElapsedButNoHigherTermRpcReceived(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
+	transferTo := commCfg.cluster.Others[0]
+	l.matchIndex[transferTo] = 2
+
+	// when
+	_, _ = l.transferLeadershipTo(transferTo)
+
+	// then
+	c.Assert(l.inTransfer, Equals, true)
+
+	// when election timeout
+	for i := int64(0); i < l.cfg.electionTimeout; i++ {
+		_ = l.TakeAction(Msg{Tp: Tick})
+	}
+
+	// then msg
+	c.Assert(l.inTransfer, Equals, false)
+	c.Assert(l.cfg.tickCnt, Equals, int64(0))
+}

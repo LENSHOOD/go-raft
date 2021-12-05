@@ -18,6 +18,14 @@ type Leader struct {
 func (l *Leader) TakeAction(msg Msg) Msg {
 	switch msg.Tp {
 	case Tick:
+		if l.inTransfer {
+			l.cfg.tickCnt++
+			if l.cfg.tickCnt == l.cfg.electionTimeout {
+				l.inTransfer = false
+				l.cfg.tickCnt = 0
+			}
+		}
+
 		return l.sendHeartbeat()
 
 	case Cmd:
@@ -235,5 +243,6 @@ func NewLeader(c *Candidate) *Leader {
 	}
 
 	l.cfg.leader = l.cfg.cluster.Me
+	l.cfg.tickCnt = 0
 	return l
 }
