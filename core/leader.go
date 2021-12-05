@@ -20,10 +20,18 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 	case Tick:
 		if l.inTransfer {
 			l.cfg.tickCnt++
-			if l.cfg.tickCnt == l.cfg.electionTimeout {
-				l.inTransfer = false
+
+			// first tick after in transfer be set
+			if l.cfg.tickCnt == 1 {
+				if timeoutNowReq, ok := l.tryTransferLeadership(); ok {
+					return timeoutNowReq
+				}
+
+				// reset tickCnt to let it retry transfer leader at next tick
 				l.cfg.tickCnt = 0
 			}
+
+			l.tryClearInTransfer()
 		}
 
 		return l.sendHeartbeat()
@@ -50,6 +58,13 @@ func (l *Leader) TakeAction(msg Msg) Msg {
 	}
 
 	return NullMsg
+}
+
+func (l *Leader) tryClearInTransfer() {
+	if l.cfg.tickCnt == l.cfg.electionTimeout {
+		l.inTransfer = false
+		l.cfg.tickCnt = 0
+	}
 }
 
 func (l *Leader) sendHeartbeat() Msg {
@@ -156,6 +171,10 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 	if l.cfg.cluster.meetMajority(majorityCnt) && currFollowerMatchedTerm == l.currentTerm {
 		// send resp only if there is a not-yet-response cmd req existed
 		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
+			if _, ok := l.getEntryByIdx(i).Cmd.(*ConfigChangeCmd); ok && !l.isMeIncludedInCluster() {
+				l.inTransfer = true
+			}
+
 			l.commitIndex = i
 			res := l.applyCmdToStateMachine()
 
@@ -207,12 +226,25 @@ func (l *Leader) resendAppendLogWithDecreasedIdx(followerId Id) Msg {
 	})
 }
 
-func (l *Leader) transferLeadershipTo(followerId Id) (msg Msg, eligibleToTransfer bool) {
-	if l.matchIndex[followerId] < l.getLastEntry().Idx {
-		return NullMsg, false
+func (l *Leader) tryTransferLeadership() (msg Msg, eligibleToTransfer bool) {
+	idxShouldMatch := l.getLastEntry().Idx
+	for id, index := range l.matchIndex {
+		if index == idxShouldMatch {
+			return l.pointReq(id, &TimeoutNowReq{Term: l.currentTerm}), true
+		}
 	}
 
-	return l.pointReq(followerId, &TimeoutNowReq{Term: l.currentTerm}), true
+	return NullMsg, false
+}
+
+func (l *Leader) isMeIncludedInCluster() bool {
+	for _, member := range l.cfg.cluster.Members {
+		if l.cfg.cluster.Me == member {
+			return true
+		}
+	}
+
+	return false
 }
 
 func NewLeader(c *Candidate) *Leader {

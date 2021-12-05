@@ -418,7 +418,7 @@ func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChange
 		c.Assert(cmdResp.Success, Equals, false)
 	} else {
 		c.Fail()
-		c.Logf("Payload should be AppendEntriesReq")
+		c.Logf("Payload should be CmdResp")
 	}
 
 	// no change effected, no entry appended
@@ -427,46 +427,49 @@ func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChange
 	c.Assert(l.getLastEntry().Idx, Equals, Index(3))
 }
 
-func (t *T) TestLeaderShouldSendTimeoutNowReqToGivenServerAndToggleInTransferFlagWhenDecideToTransferLeadership(c *C) {
+func (t *T) TestLeaderShouldFindServerThatAllLogReplicatedAndSendTimeoutNowReqToItWhenCallLeaderTransfer(c *C) {
 	// given
 	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
-	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
-	transferTo := commCfg.cluster.Members[1]
-	l.matchIndex[transferTo] = 2
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 2, Idx: 3, Cmd: "3"}}
+	l.matchIndex[l.cfg.cluster.Members[1]] = 2
+	l.matchIndex[l.cfg.cluster.Members[2]] = 1
+	l.matchIndex[l.cfg.cluster.Members[3]] = 3
+	l.matchIndex[l.cfg.cluster.Members[4]] = InvalidIndex
 
 	// when
-	res, ok := l.transferLeadershipTo(transferTo)
+	res, ok := l.tryTransferLeadership()
 
 	// then msg
 	c.Assert(ok, Equals, true)
 	c.Assert(res.Tp, Equals, Rpc)
-	c.Assert(res.To, Equals, transferTo)
+	c.Assert(res.To, Equals, l.cfg.cluster.Members[3])
 
 	// then payload
 	if resp, ok := res.Payload.(*TimeoutNowReq); ok {
 		c.Assert(resp.Term, Equals, l.currentTerm)
 	} else {
 		c.Fail()
-		c.Logf("Payload should be AppendEntriesReq")
+		c.Logf("Payload should be TimeoutNowReq")
 	}
 }
 
-func (t *T) TestLeaderShouldNotSendTimeoutNowReqIfGivenFollowerNotCatchUpWithLog(c *C) {
+func (t *T) TestLeaderShouldNotSendTimeoutNowReqIfNoFollowersCatchUpWithLog(c *C) {
 	// given
 	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
-	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
-	transferTo := commCfg.cluster.Members[1]
-	// not catch up with leader
-	l.matchIndex[transferTo] = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 2, Idx: 3, Cmd: "3"}}
+	l.matchIndex[l.cfg.cluster.Members[1]] = 2
+	l.matchIndex[l.cfg.cluster.Members[2]] = 1
+	l.matchIndex[l.cfg.cluster.Members[3]] = 2
+	l.matchIndex[l.cfg.cluster.Members[4]] = InvalidIndex
 
 	// when
-	res, ok := l.transferLeadershipTo(transferTo)
+	res, ok := l.tryTransferLeadership()
 
 	// then msg
 	c.Assert(ok, Equals, false)
@@ -499,7 +502,7 @@ func (t *T) TestLeaderShouldRejectAnyCmdIfInTransferFlagIsTrue(c *C) {
 		c.Assert(cmdResp.Success, Equals, false)
 	} else {
 		c.Fail()
-		c.Logf("Payload should be AppendEntriesReq")
+		c.Logf("Payload should be CmdResp")
 	}
 }
 
@@ -519,4 +522,103 @@ func (t *T) TestLeaderShouldClearInTransferFlagAndGoBackToLeaderIfElectionTimeou
 	// then msg
 	c.Assert(l.inTransfer, Equals, false)
 	c.Assert(l.cfg.tickCnt, Equals, int64(0))
+}
+
+func (t *T) TestLeaderShouldSetInTransferFlagWhenLatestLeaderEvictionConfigChangeCommitted(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 2
+	l.commitIndex = 2
+	l.lastApplied = 2
+	l.cfg.cluster.Members = []Id{190152, -2534, 96775, 2344359}
+	l.log = []Entry{
+		{Term: 1, Idx: 1, Cmd: "1"},
+		{Term: 1, Idx: 2, Cmd: "2"},
+		{Term: 2, Idx: 3, Cmd: &ConfigChangeCmd{Members: []Id{190152, -2534, 96775, 2344359}}},
+	}
+	l.matchIndex[l.cfg.cluster.Members[1]] = 2
+	l.nextIndex[l.cfg.cluster.Members[1]] = 3
+	l.matchIndex[l.cfg.cluster.Members[2]] = 2
+	l.nextIndex[l.cfg.cluster.Members[2]] = 3
+	l.matchIndex[l.cfg.cluster.Members[3]] = 2
+	l.nextIndex[l.cfg.cluster.Members[3]] = 3
+
+	buildResp := func(id Id) Msg {
+		return Msg{
+			Tp:   Rpc,
+			From: id,
+			To:   l.cfg.leader,
+			Payload: &AppendEntriesResp{
+				Term:    2,
+				Success: true,
+			},
+		}
+	}
+
+	// when the majority of members committed config change entry
+	_ = l.TakeAction(buildResp(l.cfg.cluster.Members[1]))
+	_ = l.TakeAction(buildResp(l.cfg.cluster.Members[2]))
+	_ = l.TakeAction(buildResp(l.cfg.cluster.Members[3]))
+
+	// then
+	c.Assert(l.matchIndex[l.cfg.cluster.Members[1]], Equals, Index(3))
+	c.Assert(l.matchIndex[l.cfg.cluster.Members[2]], Equals, Index(3))
+	c.Assert(l.matchIndex[l.cfg.cluster.Members[3]], Equals, Index(3))
+
+	// inTransfer should be set because of leader eviction
+	c.Assert(l.inTransfer, Equals, true)
+}
+
+func (t *T) TestLeaderWillSendTimeoutNowReqToMostCatchUpFollowerWhenInTransferSetTrue(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 2, Idx: 3, Cmd: "3"}}
+	l.matchIndex[l.cfg.cluster.Members[1]] = 2
+	l.matchIndex[l.cfg.cluster.Members[2]] = 1
+	l.matchIndex[l.cfg.cluster.Members[3]] = 3
+	l.matchIndex[l.cfg.cluster.Members[4]] = InvalidIndex
+	l.inTransfer = true
+
+	// when
+	res := l.TakeAction(Msg{Tp: Tick})
+
+	// then msg
+	c.Assert(res.Tp, Equals, Rpc)
+	c.Assert(res.To, Equals, l.cfg.cluster.Members[3])
+
+	// then payload
+	if resp, ok := res.Payload.(*TimeoutNowReq); ok {
+		c.Assert(resp.Term, Equals, l.currentTerm)
+	} else {
+		c.Fail()
+		c.Logf("Payload should be TimeoutNowReq")
+	}
+}
+
+func (t *T) TestLeaderWillNotSendTimeoutNowReqIfNoFollowerCatchUpWhenInTransferSetTrue(c *C) {
+	// given
+	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l.currentTerm = 1
+	l.commitIndex = 1
+	l.lastApplied = 1
+	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 2, Idx: 3, Cmd: "3"}}
+	l.matchIndex[l.cfg.cluster.Members[1]] = 2
+	l.matchIndex[l.cfg.cluster.Members[2]] = 1
+	l.matchIndex[l.cfg.cluster.Members[3]] = 2
+	l.matchIndex[l.cfg.cluster.Members[4]] = InvalidIndex
+	l.inTransfer = true
+
+	// when
+	res := l.TakeAction(Msg{Tp: Tick})
+
+	// then payload
+	if resp, ok := res.Payload.(*AppendEntriesReq); ok {
+		c.Assert(len(resp.Entries), Equals, 0)
+	} else {
+		c.Fail()
+		c.Logf("Payload should be AppendEntriesReq")
+	}
 }
