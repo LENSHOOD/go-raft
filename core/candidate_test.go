@@ -12,7 +12,7 @@ func (t *T) TestCandidateCanStartElection(c *C) {
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
 		Entry{Term: 4, Idx: 5, Cmd: ""})
 
-	cand := f.toCandidate()
+	cand := f.toCandidate(false)
 	tick := Msg{Tp: Tick}
 
 	// when
@@ -40,7 +40,7 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 	voteFollowerId0 := commCfg.cluster.Members[1]
 	voteFollowerId1 := commCfg.cluster.Members[3]
 
-	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 	cand.currentTerm = 1
 
 	buildResp := func(id Id) Msg {
@@ -69,7 +69,7 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 	// given
-	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 
 	voteFollowerId0 := commCfg.cluster.Members[1]
 	resp := Msg{
@@ -96,7 +96,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveVoteRespNewTerm(c *C) {
 
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
 	// given
-	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 
 	newCandidate := commCfg.cluster.Members[1]
 	resp := Msg{
@@ -123,7 +123,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveReqVoteWithNewTerm(c *C) {
 
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 	// given
-	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 	cand.currentTerm = 3
 
 	req := Msg{
@@ -150,7 +150,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqNewTerm(c *C) {
 
 func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqCurrentTerm(c *C) {
 	// given
-	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 	cand.currentTerm = 3
 
 	req := Msg{
@@ -177,7 +177,7 @@ func (t *T) TestCandidateWillBackToFollowerWhenReceiveAppendReqCurrentTerm(c *C)
 
 func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 	// given
-	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 	cand.currentTerm = 2
 
 	// when
@@ -215,7 +215,7 @@ func (t *T) TestCandidateShouldIgnoreAnyMsgThatTermOlderThanItself(c *C) {
 func (t *T) TestCandidateTriggerElectionTimeoutWithEmptyTick(c *C) {
 	// given
 	currTerm := Term(1)
-	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 	cand.currentTerm = currTerm
 	cand.cfg.electionTimeout = 3
 	cand.cfg.tickCnt = 2
@@ -246,7 +246,7 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 	voteFollowerId0 := commCfg.cluster.Members[1]
 	voteFollowerId1 := commCfg.cluster.Members[3]
 
-	cand := NewFollower(commCfg, mockSm).toCandidate()
+	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 	cand.currentTerm = 3
 	cand.log = append(cand.log, Entry{Term: 1, Idx: 1, Cmd: ""},
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},

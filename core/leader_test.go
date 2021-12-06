@@ -6,7 +6,7 @@ import (
 
 func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: ""}}
 
 	heartbeatDivideFactor = 3
@@ -33,7 +33,7 @@ func (t *T) TestLeaderShouldSendHeartbeatEveryFixedTicks(c *C) {
 
 func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -74,7 +74,7 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 
 func (t *T) TestLeaderShouldIncrementMatchIndexToLastIdxWhenReceiveSuccessRespFromFollower(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -112,7 +112,7 @@ func (t *T) TestLeaderShouldIncrementMatchIndexToLastIdxWhenReceiveSuccessRespFr
 
 func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiveMajoritySuccesses(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -183,7 +183,7 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 
 func (t *T) TestLeaderWillBackToFollowerWhenReceiveAppendLogRpcWithNewTerm(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 3
 
 	req := Msg{
@@ -210,7 +210,7 @@ func (t *T) TestLeaderWillBackToFollowerWhenReceiveAppendLogRpcWithNewTerm(c *C)
 
 func (t *T) TestLeaderWillIgnoreNonLeaderTransferRequestVoteRpcWithNewTerm(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 3
 
 	req := Msg{
@@ -231,7 +231,7 @@ func (t *T) TestLeaderWillIgnoreNonLeaderTransferRequestVoteRpcWithNewTerm(c *C)
 
 func (t *T) TestLeaderWillBackToFollowerWhenReceiveLeaderTransferRequestVoteRpcWithNewTerm(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 3
 
 	req := Msg{
@@ -257,7 +257,7 @@ func (t *T) TestLeaderWillBackToFollowerWhenReceiveLeaderTransferRequestVoteRpcW
 
 func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -298,7 +298,7 @@ func (t *T) TestLeaderShouldDecreaseNextIndexWhenReceiveFailureRespFromFollower(
 
 func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailureRespFromFollower(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -341,7 +341,7 @@ func (t *T) TestLeaderShouldKeepDecreaseNextIndexUntilFirstEntryWhenReceiveFailu
 
 func (t *T) TestLeaderShouldNotCommitIfTheSatisfiedMajorityEntryIsNotAtCurrentTermUntilFirstCurrentTermEntryHasSuccessfullySatisfiedMajority(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 3
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -390,7 +390,7 @@ func (t *T) TestLeaderShouldNotCommitIfTheSatisfiedMajorityEntryIsNotAtCurrentTe
 
 func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigChangeLog(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -432,7 +432,7 @@ func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigC
 
 func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChangeLogExist(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -476,7 +476,7 @@ func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChange
 
 func (t *T) TestLeaderShouldFindServerThatAllLogReplicatedAndSendTimeoutNowReqToItWhenCallLeaderTransfer(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -505,7 +505,7 @@ func (t *T) TestLeaderShouldFindServerThatAllLogReplicatedAndSendTimeoutNowReqTo
 
 func (t *T) TestLeaderShouldNotSendTimeoutNowReqIfNoFollowersCatchUpWithLog(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -526,7 +526,7 @@ func (t *T) TestLeaderShouldNotSendTimeoutNowReqIfNoFollowersCatchUpWithLog(c *C
 
 func (t *T) TestLeaderShouldRejectAnyCmdIfInTransferFlagIsTrue(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.inTransfer = true
 
 	cmdReqMsg := Msg{
@@ -555,7 +555,7 @@ func (t *T) TestLeaderShouldRejectAnyCmdIfInTransferFlagIsTrue(c *C) {
 
 func (t *T) TestLeaderShouldClearInTransferFlagAndGoBackToLeaderIfElectionTimeoutElapsedButNoHigherTermRpcReceived(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
 	transferTo := commCfg.cluster.Members[1]
 	l.matchIndex[transferTo] = 2
@@ -573,7 +573,7 @@ func (t *T) TestLeaderShouldClearInTransferFlagAndGoBackToLeaderIfElectionTimeou
 
 func (t *T) TestLeaderShouldSetInTransferFlagWhenLatestLeaderEvictionConfigChangeCommitted(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 2
 	l.commitIndex = 2
 	l.lastApplied = 2
@@ -618,7 +618,7 @@ func (t *T) TestLeaderShouldSetInTransferFlagWhenLatestLeaderEvictionConfigChang
 
 func (t *T) TestLeaderWillSendTimeoutNowReqToMostCatchUpFollowerWhenInTransferSetTrue(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1
@@ -647,7 +647,7 @@ func (t *T) TestLeaderWillSendTimeoutNowReqToMostCatchUpFollowerWhenInTransferSe
 
 func (t *T) TestLeaderWillNotSendTimeoutNowReqIfNoFollowerCatchUpWhenInTransferSetTrue(c *C) {
 	// given
-	l := NewFollower(commCfg, mockSm).toCandidate().toLeader()
+	l := NewFollower(commCfg, mockSm).toCandidate(false).toLeader()
 	l.currentTerm = 1
 	l.commitIndex = 1
 	l.lastApplied = 1

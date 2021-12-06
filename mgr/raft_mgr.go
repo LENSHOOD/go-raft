@@ -235,6 +235,10 @@ func (m *RaftManager) Run() {
 		}
 
 		if res != core.NullMsg {
+			// update whole cluster to catch up with raft object config change
+			// TODO: only a temporary solution, try more elegant approach
+			m.updateCluster(m.obj.GetCluster())
+
 			span, spctx := opentracing.StartSpanFromContext(ctx, "mgr-process-raft-result")
 			switch res.Tp {
 			case core.MoveState:
@@ -306,6 +310,21 @@ func (m *RaftManager) Stop() {
 	m.Dispatcher.clearAll()
 }
 
+func (m *RaftManager) updateCluster(cls core.Cluster) {
+	var others []Address
+	for _, id := range cls.Members {
+		addr, exist := m.getAddrById(id)
+		if !exist {
+			log.Fatalf("Cluster server not found, id %d.", id)
+		}
+		if addr != m.cfg.Me {
+			others = append(others, addr)
+		}
+	}
+
+	m.cfg.Others = others
+}
+
 func (m *RaftManager) assertDebugMode() {
 	if !m.cfg.DebugMode {
 		log.Fatalf("Cannot run debug method if DebugMode is off.")
@@ -365,9 +384,8 @@ func NewRaftMgrWithTicker(cfg Config, sm core.StateMachine, inputCh chan *Rpc, t
 	return &mgr
 }
 
-var hash = fnv.New64()
-
 func genId(addr Address) core.Id {
+	hash := fnv.New64()
 	_, _ = hash.Write([]byte(addr))
 	return core.Id(hash.Sum64())
 }

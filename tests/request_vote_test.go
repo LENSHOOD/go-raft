@@ -129,7 +129,7 @@ func (t *T) TestShorterCommittedLogHolderCanNeverBeLeader(c *C) {
 	// run command
 	r.exec(leader, core.Command(strOfI), mgr.Address(strOfI))
 
-	// let first entry comitted
+	// let first entry committed
 	waitNumOfSvrLogLength(c, svrs, 1, 2)
 
 	// hold leader
@@ -142,6 +142,8 @@ func (t *T) TestShorterCommittedLogHolderCanNeverBeLeader(c *C) {
 			Addr: "",
 			Payload: &core.RequestVoteReq{
 				Term: 2,
+				// leader transfer == true force follower turn to candidate
+				LeaderTransfer: true,
 			},
 		}
 	}

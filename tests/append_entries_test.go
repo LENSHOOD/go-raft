@@ -176,19 +176,27 @@ func (t *T) TestClusterCanFinallyReachConsistentAfterLeaderAndFollowerHold(c *C)
 	r.resume(leader2)
 	waitNumOfSvrLogLength(c, svrs, 5, 5)
 
-	expectationLog := []core.Entry{
-		{Term: 1, Idx: 1, Cmd: "1"},
-		{Term: 1, Idx: 2, Cmd: "2"},
-		{Term: 2, Idx: 3, Cmd: "3"},
-		{Term: 2, Idx: 4, Cmd: "4"},
-		{Term: 3, Idx: 5, Cmd: "5"},
+	// due to prevent disruptive server, election may last for several terms
+	expectationLogIdx := []core.Index{1, 2, 3, 4, 5}
+	expectationLogCmd := []core.Command{"1", "2", "3", "4", "5"}
+
+	sameIdxAndCmd := func(entries []core.Entry, expectationIdxes []core.Index, expectationCmds []core.Command) {
+		var realIdxes []core.Index
+		var realCmds []core.Command
+		for _, entry := range entries {
+			realIdxes = append(realIdxes, entry.Idx)
+			realCmds = append(realCmds, entry.Cmd)
+		}
+
+		c.Assert(realIdxes, DeepEquals, expectationIdxes)
+		c.Assert(realCmds, DeepEquals, expectationCmds)
 	}
 
-	c.Assert(svr0.mgr.GetAllEntries(), DeepEquals, expectationLog)
-	c.Assert(svr1.mgr.GetAllEntries(), DeepEquals, expectationLog)
-	c.Assert(svr2.mgr.GetAllEntries(), DeepEquals, expectationLog)
-	c.Assert(svr3.mgr.GetAllEntries(), DeepEquals, expectationLog)
-	c.Assert(svr4.mgr.GetAllEntries(), DeepEquals, expectationLog)
+	sameIdxAndCmd(svr0.mgr.GetAllEntries(), expectationLogIdx, expectationLogCmd)
+	sameIdxAndCmd(svr1.mgr.GetAllEntries(), expectationLogIdx, expectationLogCmd)
+	sameIdxAndCmd(svr2.mgr.GetAllEntries(), expectationLogIdx, expectationLogCmd)
+	sameIdxAndCmd(svr3.mgr.GetAllEntries(), expectationLogIdx, expectationLogCmd)
+	sameIdxAndCmd(svr4.mgr.GetAllEntries(), expectationLogIdx, expectationLogCmd)
 
 	close(r.done)
 	svr0.mgr.Stop()

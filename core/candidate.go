@@ -26,10 +26,10 @@ func (c *Candidate) TakeAction(msg Msg) Msg {
 			lastEntry := c.getLastEntry()
 			return c.broadcastReq(
 				&RequestVoteReq{
-					Term:         c.currentTerm,
-					CandidateId:  c.cfg.cluster.Me,
-					LastLogIndex: lastEntry.Idx,
-					LastLogTerm:  lastEntry.Term,
+					Term:           c.currentTerm,
+					CandidateId:    c.cfg.cluster.Me,
+					LastLogIndex:   lastEntry.Idx,
+					LastLogTerm:    lastEntry.Term,
 					LeaderTransfer: c.leaderTransfer,
 				})
 		}
@@ -103,6 +103,9 @@ func NewCandidate(f *Follower, leaderTransfer bool) *Candidate {
 
 	// vote self
 	c.votedFor = c.cfg.cluster.Me
+
+	// reset to no leader
+	c.cfg.leader = InvalidId
 
 	return c
 }

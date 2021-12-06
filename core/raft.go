@@ -31,6 +31,7 @@ type Entry struct {
 type RaftObject interface {
 	TakeAction(msg Msg) Msg
 	GetAllEntries() []Entry
+	GetCluster() Cluster
 }
 
 type Cluster struct {
@@ -176,4 +177,8 @@ func (r *RaftBase) applyCmdToStateMachine() interface{} {
 
 func (r *RaftBase) GetAllEntries() []Entry {
 	return r.log
+}
+
+func (r *RaftBase) GetCluster() Cluster {
+	return r.cfg.cluster
 }

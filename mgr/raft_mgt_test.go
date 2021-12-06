@@ -74,6 +74,11 @@ func (f *fakeRaftObject) TakeAction(msg core.Msg) core.Msg {
 
 func (f *fakeRaftObject) GetAllEntries() []core.Entry { return []core.Entry{} }
 
+func (f *fakeRaftObject) GetCluster() core.Cluster {
+	return core.Cluster{Me: -758425088686972977,
+		Members: []core.Id{-758425088686972977, 1994190997193380571, 1295702547957371954, 6266824331869198845, -106856633615314508}}
+}
+
 func (t *T) TestTick(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
