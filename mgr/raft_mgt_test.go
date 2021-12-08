@@ -75,9 +75,11 @@ func (f *fakeRaftObject) TakeAction(msg core.Msg) core.Msg {
 func (f *fakeRaftObject) GetAllEntries() []core.Entry { return []core.Entry{} }
 
 func (f *fakeRaftObject) GetCluster() core.Cluster {
-	return core.Cluster{Me: -758425088686972977,
-		Members: []core.Id{-758425088686972977, 1994190997193380571, 1295702547957371954, 6266824331869198845, -106856633615314508}}
+	return f.Called().Get(0).(core.Cluster)
 }
+
+var standardCluster = core.Cluster{Me: -758425088686972977,
+	Members: []core.Id{-758425088686972977, 1994190997193380571, 1295702547957371954, 6266824331869198845, -106856633615314508}}
 
 func (t *T) TestTick(c *C) {
 	// given
@@ -105,6 +107,7 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 		Tp:      core.MoveState,
 		Payload: &core.Follower{},
 	})
+	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
 	// when
@@ -134,6 +137,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 		Tp:      core.Rpc,
 		Payload: &core.AppendEntriesResp{Term: 10},
 	})
+	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
 	// when
@@ -164,6 +168,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 		To:      core.All,
 		Payload: &core.AppendEntriesReq{Term: 10},
 	})
+	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
 	// when
@@ -197,6 +202,7 @@ func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 		msg := args[0].(core.Msg)
 		c.Assert(msg.Tp, Equals, core.Cmd)
 	})
+	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
 	// when
@@ -220,6 +226,7 @@ func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMs
 		Tp:      core.Rpc,
 		Payload: &core.CmdResp{Success: true},
 	})
+	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
 	// when
@@ -349,6 +356,7 @@ func (t *T) TestRaftMgrShouldConvertLeaderIdToLeaderAddressWhenReceiveFalseCmdRe
 
 			c.Assert(msg.Tp, Equals, core.Cmd)
 		})
+	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
 	clientAddr := Address("addr")
@@ -397,6 +405,7 @@ func (t *T) TestRaftMgrShouldReturnSelfAddressWhenReceiveFalseCmdRespWithInvalid
 
 			c.Assert(msg.Tp, Equals, core.Cmd)
 		})
+	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
 	clientAddr := Address("addr")
@@ -419,5 +428,57 @@ func (t *T) TestRaftMgrShouldReturnSelfAddressWhenReceiveFalseCmdRespWithInvalid
 	} else {
 		c.Assert(cmdResp.Success, Equals, false)
 		c.Assert(cmdResp.Result, Equals, mgr.cfg.Me)
+	}
+}
+
+func (t *T) TestConfigChangeAddServerWillBeConvertToConfigChangeCmd(c *C) {
+	// given
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mockObj := new(fakeRaftObject)
+	mockObj.
+		On("GetCluster", mock.Anything).
+		Return(core.Cluster{Me: 1, Members: []core.Id{1, 2, 3, 4, 5}})
+	mgr.obj = mockObj
+
+	serverToAdd := Address("127.0.0.1:10001")
+	mgr.addrMapId.Store(serverToAdd, core.Id(6))
+
+	// when
+	cc := &ConfigChange{Op: Add, Server: serverToAdd}
+	cmd := mgr.convertConfigChangeToCmd(cc)
+
+	// then
+	if resp, ok := cmd.(*core.ConfigChangeCmd); ok {
+		c.Assert(resp.Members, DeepEquals, []core.Id{1, 2, 3, 4, 5, 6})
+	} else {
+		c.Fail()
+		c.Logf("Payload should be ConfigChangeCmd")
+	}
+}
+
+func (t *T) TestConfigChangeRemoveServerWillBeConvertToConfigChangeCmd(c *C) {
+	// given
+	inputCh := make(chan *Rpc, 10)
+	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mockObj := new(fakeRaftObject)
+	mockObj.
+		On("GetCluster", mock.Anything).
+		Return(core.Cluster{Me: 1, Members: []core.Id{1, 2, 3, 4, 5}})
+	mgr.obj = mockObj
+
+	serverToAdd := Address(":32104")
+	mgr.addrMapId.Store(serverToAdd, core.Id(1))
+
+	// when
+	cc := &ConfigChange{Op: Remove, Server: serverToAdd}
+	cmd := mgr.convertConfigChangeToCmd(cc)
+
+	// then
+	if resp, ok := cmd.(*core.ConfigChangeCmd); ok {
+		c.Assert(resp.Members, DeepEquals, []core.Id{2, 3, 4, 5})
+	} else {
+		c.Fail()
+		c.Logf("Payload should be ConfigChangeCmd")
 	}
 }

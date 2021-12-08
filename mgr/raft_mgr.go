@@ -22,6 +22,18 @@ type Rpc struct {
 	Payload interface{}
 }
 
+type ConfigOp int
+
+const (
+	Add ConfigOp = iota
+	Remove
+)
+
+type ConfigChange struct {
+	Op     ConfigOp
+	Server Address
+}
+
 type Config struct {
 	Me                   Address
 	Others               []Address
@@ -219,6 +231,11 @@ func (m *RaftManager) Run() {
 			ctx = spctx
 
 			logger.Printf("[MGR-%s] Received from %s: %s", m.cfg.Me, req.Addr, req.Payload)
+
+			if cc, ok := res.Payload.(*ConfigChange); ok {
+				res.Payload = &core.CmdReq{Cmd: m.convertConfigChangeToCmd(cc)}
+			}
+
 			tp := core.Rpc
 			if _, ok := req.Payload.(*core.CmdReq); ok {
 				tp = core.Cmd
@@ -323,6 +340,27 @@ func (m *RaftManager) updateCluster(cls core.Cluster) {
 	}
 
 	m.cfg.Others = others
+}
+
+func (m *RaftManager) convertConfigChangeToCmd(cc *ConfigChange) core.Command {
+	currMember := m.obj.GetCluster().Members
+	newMember := make([]core.Id, 0)
+	givenId := m.getIdByAddr(cc.Server)
+
+	switch cc.Op {
+	case Add:
+		newMember = append(append(newMember, currMember...), givenId)
+	case Remove:
+		for _, id := range currMember {
+			if id == givenId {
+				continue
+			}
+
+			newMember = append(newMember, id)
+		}
+	}
+
+	return &core.ConfigChangeCmd{Members: newMember, PrevMembers: currMember}
 }
 
 func (m *RaftManager) assertDebugMode() {
