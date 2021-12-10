@@ -397,7 +397,7 @@ func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigC
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
 
 	configChangeCmd := &ConfigChangeCmd{
-		Members: []Id{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"},
+		Members: []Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104", "192.168.1.6:32104"},
 	}
 
 	cmdReqMsg := Msg{
@@ -427,7 +427,11 @@ func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigC
 
 	// config changed
 	c.Assert(l.cfg.cluster.Me, Equals, Id("192.168.1.1:32104"))
-	c.Assert(l.cfg.cluster.Members, DeepEquals, []Id{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"})
+	c.Assert(l.cfg.cluster.Members, DeepEquals, []Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104", "192.168.1.6:32104"})
+
+	// nextIndex and matchIndex
+	c.Assert(l.nextIndex["192.168.1.6:32104"], Equals, Index(4))
+	c.Assert(l.matchIndex["192.168.1.6:32104"], Equals, InvalidIndex)
 }
 
 func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChangeLogExist(c *C) {

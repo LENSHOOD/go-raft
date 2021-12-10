@@ -114,6 +114,22 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 		_ = copy(configChangedCmd.PrevMembers, l.cfg.cluster.Members)
 
 		l.cfg.cluster.replaceTo(configChangedCmd.Members)
+
+		// found add server, init nextIndex and matchIndex
+		if len(configChangedCmd.Members) > len(configChangedCmd.PrevMembers) {
+			for _, member := range configChangedCmd.Members {
+				for _, prevMember := range configChangedCmd.PrevMembers {
+					if member != prevMember {
+						// lastEntry.Idx + 2 count this config change entry in
+						l.nextIndex[member] = lastEntry.Idx + 2
+						l.matchIndex[member] = InvalidIndex
+						break
+					}
+				}
+			}
+		}
+
+		// TODO: found removed server, delete related nextIndex and matchIndex
 	}
 
 	newEntry := Entry{

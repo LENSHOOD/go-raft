@@ -85,6 +85,7 @@ func newSvr(svrNo int, svrNum int) *svr {
 
 type router struct {
 	done         chan struct{}
+	pauseCh      chan struct{}
 	svrs         map[mgr.Address]*svr
 	svrOutputChs map[mgr.Address][]<-chan *mgr.Rpc
 	holds        sync.Map
@@ -92,7 +93,7 @@ type router struct {
 }
 
 func newRouter() *router {
-	return &router{done: make(chan struct{}), svrs: make(map[mgr.Address]*svr), svrOutputChs: make(map[mgr.Address][]<-chan *mgr.Rpc)}
+	return &router{done: make(chan struct{}), pauseCh: make(chan struct{}), svrs: make(map[mgr.Address]*svr), svrOutputChs: make(map[mgr.Address][]<-chan *mgr.Rpc)}
 }
 
 func (r *router) register(svr *svr) {
@@ -126,6 +127,12 @@ func (r *router) run() {
 	}
 
 	for {
+		select {
+		case <-r.pauseCh:
+			continue
+		default:
+		}
+
 		for addr := range r.svrs {
 			select {
 			case <-r.done:
@@ -144,6 +151,14 @@ func (r *router) run() {
 	}
 }
 
+func (r *router) pause() {
+	close(r.pauseCh)
+}
+
+func (r *router) rerun() {
+	r.pauseCh = make(chan struct{})
+}
+
 func (r *router) hold(svr *svr) {
 	r.holds.Store(svr.addr, nil)
 }
@@ -157,6 +172,14 @@ func (r *router) exec(svr *svr, cmd core.Command, clientAddr mgr.Address) {
 		Ctx:     context.TODO(),
 		Addr:    clientAddr,
 		Payload: &core.CmdReq{Cmd: cmd},
+	}
+}
+
+func (r *router) changeSvr(svr *svr, cc *mgr.ConfigChange, clientAddr mgr.Address) {
+	svr.inputCh <- &mgr.Rpc{
+		Ctx:     context.TODO(),
+		Addr:    clientAddr,
+		Payload: cc,
 	}
 }
 

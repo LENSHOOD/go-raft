@@ -212,8 +212,8 @@ func (m *RaftManager) Run() {
 
 			logger.Printf("[MGR-%s] Received from %s: %s", m.cfg.Me, req.Addr, req.Payload)
 
-			if cc, ok := res.Payload.(*ConfigChange); ok {
-				res.Payload = &core.CmdReq{Cmd: m.convertConfigChangeToCmd(cc)}
+			if cc, ok := req.Payload.(*ConfigChange); ok {
+				req.Payload = &core.CmdReq{Cmd: m.convertConfigChangeToCmd(cc)}
 			}
 
 			tp := core.Rpc
@@ -366,6 +366,11 @@ func (m *RaftManager) IsFollower() bool {
 func (m *RaftManager) GetAllEntries() []core.Entry {
 	m.assertDebugMode()
 	return m.obj.GetAllEntries()
+}
+
+func (m *RaftManager) GetConfig() Config {
+	m.assertDebugMode()
+	return m.cfg
 }
 
 func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManager {
