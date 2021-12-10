@@ -5,7 +5,6 @@ import (
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/opentracing/opentracing-go"
 	opLog "github.com/opentracing/opentracing-go/log"
-	"hash/fnv"
 	"log"
 	"reflect"
 	"sync"
@@ -43,33 +42,14 @@ type Config struct {
 	DebugMode            bool
 }
 
-type addrIdMapper struct {
-	addrMapId sync.Map
-	idMapAddr sync.Map
-}
+type addrIdMapper struct{}
 
 func (aim *addrIdMapper) getIdByAddr(addr Address) core.Id {
-	id, loaded := aim.addrMapId.LoadOrStore(addr, genId(addr))
-	if !loaded {
-		aim.idMapAddr.Store(id, addr)
-	}
-
-	return id.(core.Id)
+	return core.Id(addr)
 }
 
 func (aim *addrIdMapper) getAddrById(id core.Id) (Address, bool) {
-	if addr, ok := aim.idMapAddr.Load(id); ok {
-		return addr.(Address), ok
-	}
-
-	return *new(Address), false
-}
-
-func (aim *addrIdMapper) remove(addr Address) {
-	id, loaded := aim.addrMapId.LoadAndDelete(addr)
-	if loaded {
-		aim.idMapAddr.Delete(id)
-	}
+	return Address(id), true
 }
 
 type switcher struct {
@@ -267,12 +247,9 @@ func (m *RaftManager) Run() {
 					leaderId, _ := resp.Result.(core.Id)
 
 					// if no leader elected yet, return self address to let client give another try
-					addr := m.cfg.Me
-					if leaderAddress, exist := m.getAddrById(leaderId); exist {
-						addr = leaderAddress
+					if leaderId == core.InvalidId {
+						resp.Result = m.cfg.Me
 					}
-
-					resp.Result = addr
 				}
 
 				span.LogFields(opLog.Object("rpc-respond", res.Payload))
@@ -289,7 +266,7 @@ func (m *RaftManager) sendTo(ctx context.Context, to core.Id, payload interface{
 			return &Rpc{ctx, addr, payload}
 		}
 
-		logger.Fatalf("dest not exist, id: %d", to)
+		logger.Fatalf("dest not exist, id: %s", to)
 		return nil
 	}
 
@@ -301,7 +278,6 @@ func (m *RaftManager) sendTo(ctx context.Context, to core.Id, payload interface{
 		m.Dispatcher.dispatch(rpc)
 
 		if _, ok := payload.(*core.CmdResp); ok {
-			m.remove(rpc.Addr)
 			m.Dispatcher.Cancel(rpc.Addr)
 		}
 
@@ -332,7 +308,7 @@ func (m *RaftManager) updateCluster(cls core.Cluster) {
 	for _, id := range cls.Members {
 		addr, exist := m.getAddrById(id)
 		if !exist {
-			log.Fatalf("Cluster server not found, id %d.", id)
+			log.Fatalf("Cluster server not found, id %s.", id)
 		}
 		if addr != m.cfg.Me {
 			others = append(others, addr)
@@ -420,10 +396,4 @@ func NewRaftMgrWithTicker(cfg Config, sm core.StateMachine, inputCh chan *Rpc, t
 	mgr.obj = core.NewFollower(core.InitConfig(cls, cfg.ElectionTimeoutMin, cfg.ElectionTimeoutMax), sm)
 
 	return &mgr
-}
-
-func genId(addr Address) core.Id {
-	hash := fnv.New64()
-	_, _ = hash.Write([]byte(addr))
-	return core.Id(hash.Sum64())
 }

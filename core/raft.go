@@ -4,13 +4,13 @@ import (
 	"math/rand"
 )
 
-type Id int64
+type Id string
 
-const InvalidId Id = -1
+const InvalidId Id = "InvalidId"
 
-const All Id = -2
+const All Id = "All"
 
-const Composed Id = -3
+const Composed Id = "Composed"
 
 // InvalidTerm is the init value of term, which will become 1 after first follower turn to candidate.
 const InvalidTerm Term = 0

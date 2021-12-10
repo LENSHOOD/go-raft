@@ -26,35 +26,11 @@ func (m *mockStateMachine) Exec(cmd core.Command) interface{} {
 var mockSm = &mockStateMachine{}
 
 var cfg = Config{
-	Me:                   ":32104",
+	Me:                   "192.168.1.1:32104",
 	Others:               []Address{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
 	TickIntervalMilliSec: 30,
 	ElectionTimeoutMin:   10,
 	ElectionTimeoutMax:   50,
-}
-
-func (t *T) TestNewRaftMgr(c *C) {
-	// when
-	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
-
-	// then
-	_, isFollower := mgr.obj.(*core.Follower)
-	c.Assert(isFollower, Equals, true)
-
-	count := 0
-	mgr.addrIdMapper.addrMapId.Range(func(_, _ interface{}) bool {
-		count++
-		return true
-	})
-	c.Assert(count, Equals, 5)
-
-	count = 0
-	mgr.addrIdMapper.idMapAddr.Range(func(_, _ interface{}) bool {
-		count++
-		return true
-	})
-	c.Assert(count, Equals, 5)
 }
 
 type fakeRaftObject struct{ mock.Mock }
@@ -78,8 +54,8 @@ func (f *fakeRaftObject) GetCluster() core.Cluster {
 	return f.Called().Get(0).(core.Cluster)
 }
 
-var standardCluster = core.Cluster{Me: -758425088686972977,
-	Members: []core.Id{-758425088686972977, 1994190997193380571, 1295702547957371954, 6266824331869198845, -106856633615314508}}
+var standardCluster = core.Cluster{Me: "192.168.1.1:32104",
+	Members: []core.Id{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}}
 
 func (t *T) TestTick(c *C) {
 	// given
@@ -122,10 +98,6 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 	mockObj.AssertExpectations(c)
 	_, isFollower := mgr.obj.(*core.Follower)
 	c.Assert(isFollower, Equals, true)
-	id, isExist := mgr.addrIdMapper.addrMapId.Load(rpc.Addr)
-	c.Assert(isExist, Equals, true)
-	addr, _ := mgr.addrIdMapper.idMapAddr.Load(id)
-	c.Assert(addr, Equals, rpc.Addr)
 }
 
 func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
@@ -185,10 +157,6 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 	c.Assert(len(outputCh), Equals, len(mgr.cfg.Others))
 	for i := 0; i < len(outputCh); i++ {
 		res := <-outputCh
-		id, exist := mgr.addrIdMapper.addrMapId.Load(res.Addr)
-		c.Assert(exist, Equals, true)
-		currAddr, _ := mgr.addrIdMapper.idMapAddr.Load(id)
-		c.Assert(currAddr, Equals, res.Addr)
 		c.Assert(res.Payload.(*core.AppendEntriesReq).Term, Equals, core.Term(10))
 	}
 }
@@ -215,37 +183,6 @@ func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 
 	// then
 	mockObj.AssertExpectations(c)
-}
-
-func (t *T) TestRaftMgrShouldRemoveClientIdAddrMappingWhenReceiveClientCmdRespMsg(c *C) {
-	// given
-	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
-	mockObj := new(fakeRaftObject)
-	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
-		Tp:      core.Rpc,
-		Payload: &core.CmdResp{Success: true},
-	})
-	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
-	mgr.obj = mockObj
-
-	// when
-	addr := Address("addr")
-	outputCh := mgr.Dispatcher.RegisterResp(addr)
-	cmd := &Rpc{Ctx: context.TODO(), Addr: addr, Payload: &core.CmdReq{}}
-	inputCh <- cmd
-	go mgr.Run()
-	for len(inputCh) != 0 {
-	}
-
-	// then
-	res := <-outputCh
-	mockObj.AssertExpectations(c)
-	_, isCmdResp := res.Payload.(*core.CmdResp)
-	c.Assert(isCmdResp, Equals, true)
-	_, exist := mgr.addrIdMapper.addrMapId.Load(addr)
-	c.Assert(exist, Equals, false)
-	mgr.Stop()
 }
 
 func (t *T) TestDispatcherShouldDispatchRespToRelatedChannel(c *C) {
@@ -332,57 +269,6 @@ func (t *T) TestDispatcherShouldRemoveAllChannelWhenCallClearAll(c *C) {
 	close(reqCh)
 }
 
-func (t *T) TestRaftMgrShouldConvertLeaderIdToLeaderAddressWhenReceiveFalseCmdResp(c *C) {
-	// given
-	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
-
-	leaderAddr := mgr.cfg.Others[0]
-	leaderId := mgr.getIdByAddr(leaderAddr)
-	mockObj := new(fakeRaftObject)
-	mockObj.
-		On("TakeAction", mock.Anything).
-		Return(core.Msg{
-			Tp: core.Rpc,
-			Payload: &core.CmdResp{
-				Result:  leaderId,
-				Success: false,
-			}}).
-		Run(func(args mock.Arguments) {
-			msg := args[0].(core.Msg)
-			if msg.Tp == core.Tick {
-				return
-			}
-
-			c.Assert(msg.Tp, Equals, core.Cmd)
-		})
-	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
-	mgr.obj = mockObj
-
-	clientAddr := Address("addr")
-	respCh := mgr.Dispatcher.RegisterResp(clientAddr)
-
-	// when
-	cmd := &Rpc{Ctx: context.TODO(), Addr: clientAddr, Payload: &core.CmdReq{}}
-	inputCh <- cmd
-	go mgr.Run()
-	for len(inputCh) != 0 {
-	}
-
-	cmdRespMsg := <-respCh
-
-	// then
-	mockObj.AssertExpectations(c)
-	if cmdResp, ok := cmdRespMsg.Payload.(*core.CmdResp); !ok {
-		c.Fail()
-	} else {
-		c.Assert(cmdResp.Success, Equals, false)
-		c.Assert(cmdResp.Result, Equals, leaderAddr)
-	}
-
-	mgr.Stop()
-}
-
 func (t *T) TestRaftMgrShouldReturnSelfAddressWhenReceiveFalseCmdRespWithInvalidLeaderId(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
@@ -438,11 +324,10 @@ func (t *T) TestConfigChangeAddServerWillBeConvertToConfigChangeCmd(c *C) {
 	mockObj := new(fakeRaftObject)
 	mockObj.
 		On("GetCluster", mock.Anything).
-		Return(core.Cluster{Me: 1, Members: []core.Id{1, 2, 3, 4, 5}})
+		Return(core.Cluster{Me: "192.168.1.1:32104", Members: []core.Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}})
 	mgr.obj = mockObj
 
-	serverToAdd := Address("127.0.0.1:10001")
-	mgr.addrMapId.Store(serverToAdd, core.Id(6))
+	serverToAdd := Address("192.168.1.6:32104")
 
 	// when
 	cc := &ConfigChange{Op: Add, Server: serverToAdd}
@@ -450,7 +335,7 @@ func (t *T) TestConfigChangeAddServerWillBeConvertToConfigChangeCmd(c *C) {
 
 	// then
 	if resp, ok := cmd.(*core.ConfigChangeCmd); ok {
-		c.Assert(resp.Members, DeepEquals, []core.Id{1, 2, 3, 4, 5, 6})
+		c.Assert(resp.Members, DeepEquals, []core.Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104", "192.168.1.6:32104"})
 	} else {
 		c.Fail()
 		c.Logf("Payload should be ConfigChangeCmd")
@@ -464,19 +349,18 @@ func (t *T) TestConfigChangeRemoveServerWillBeConvertToConfigChangeCmd(c *C) {
 	mockObj := new(fakeRaftObject)
 	mockObj.
 		On("GetCluster", mock.Anything).
-		Return(core.Cluster{Me: 1, Members: []core.Id{1, 2, 3, 4, 5}})
+		Return(core.Cluster{Me: "192.168.1.1:32104", Members: []core.Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}})
 	mgr.obj = mockObj
 
-	serverToAdd := Address(":32104")
-	mgr.addrMapId.Store(serverToAdd, core.Id(1))
+	serverToRemove := Address("192.168.1.1:32104")
 
 	// when
-	cc := &ConfigChange{Op: Remove, Server: serverToAdd}
+	cc := &ConfigChange{Op: Remove, Server: serverToRemove}
 	cmd := mgr.convertConfigChangeToCmd(cc)
 
 	// then
 	if resp, ok := cmd.(*core.ConfigChangeCmd); ok {
-		c.Assert(resp.Members, DeepEquals, []core.Id{2, 3, 4, 5})
+		c.Assert(resp.Members, DeepEquals, []core.Id{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"})
 	} else {
 		c.Fail()
 		c.Logf("Payload should be ConfigChangeCmd")

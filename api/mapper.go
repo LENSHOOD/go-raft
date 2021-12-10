@@ -68,7 +68,7 @@ func MapToAppendEntriesArguments(from *core.AppendEntriesReq) (to *AppendEntries
 
 	return &AppendEntriesArguments{
 		Term:         int64(from.Term),
-		LeaderId:     int64(from.LeaderId),
+		LeaderId:     string(from.LeaderId),
 		PrevLogIndex: int64(from.PrevLogIndex),
 		PrevLogTerm:  int64(from.PrevLogTerm),
 		Entries:      mapToApiEntries(from.Entries),
@@ -118,7 +118,7 @@ func MapToRequestVoteArguments(from *core.RequestVoteReq) (to *RequestVoteArgume
 
 	return &RequestVoteArguments{
 		Term:         int64(from.Term),
-		CandidateId:  int64(from.CandidateId),
+		CandidateId:  string(from.CandidateId),
 		LastLogIndex: int64(from.LastLogIndex),
 		LastLogTerm:  int64(from.LastLogTerm),
 	}

@@ -41,7 +41,7 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 
 	cmdReqMsg := Msg{
 		Tp:   Cmd,
-		From: Id(999),
+		From: Id("169.169.254.254:12345"),
 		To:   l.cfg.leader,
 		Payload: &CmdReq{
 			Cmd: "test",
@@ -69,7 +69,7 @@ func (t *T) TestLeaderShouldSendAppendLogToEveryFollower(c *C) {
 
 	// then client context
 	c.Assert(len(l.clientCtxs), Equals, 1)
-	c.Assert(l.clientCtxs[Index(3)].clientId, Equals, Id(999))
+	c.Assert(l.clientCtxs[Index(3)].clientId, Equals, Id("169.169.254.254:12345"))
 }
 
 func (t *T) TestLeaderShouldIncrementMatchIndexToLastIdxWhenReceiveSuccessRespFromFollower(c *C) {
@@ -126,8 +126,8 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 	l.nextIndex[commCfg.cluster.Members[3]] = 1
 	l.matchIndex[commCfg.cluster.Members[4]] = 1
 	l.nextIndex[commCfg.cluster.Members[4]] = 2
-	l.clientCtxs[Index(2)] = clientCtx{clientId: Id(999)}
-	l.clientCtxs[Index(3)] = clientCtx{clientId: Id(999)}
+	l.clientCtxs[Index(2)] = clientCtx{clientId: "169.169.254.254:12345"}
+	l.clientCtxs[Index(3)] = clientCtx{clientId: "169.169.254.254:12345"}
 
 	buildResp := func(id Id) Msg {
 		return Msg{
@@ -164,7 +164,7 @@ func (t *T) TestLeaderShouldIncrementCommittedIndexAndResponseToClientWhenReceiv
 		for _, msg := range msgs {
 			if payload, ok := msg.Payload.(*CmdResp); ok {
 				c.Assert(payload.Success, Equals, true)
-				c.Assert(msg.To, Equals, Id(999))
+				c.Assert(msg.To, Equals, Id("169.169.254.254:12345"))
 
 				_, exist := l.clientCtxs[Index(2)]
 				c.Assert(exist, Equals, false)
@@ -217,7 +217,7 @@ func (t *T) TestLeaderWillIgnoreNonLeaderTransferRequestVoteRpcWithNewTerm(c *C)
 		Tp: Rpc,
 		Payload: &RequestVoteReq{
 			Term:           4,
-			CandidateId:    2,
+			CandidateId:    "192.168.1.2:32104",
 			LeaderTransfer: false,
 		},
 	}
@@ -238,7 +238,7 @@ func (t *T) TestLeaderWillBackToFollowerWhenReceiveLeaderTransferRequestVoteRpcW
 		Tp: Rpc,
 		Payload: &RequestVoteReq{
 			Term:           4,
-			CandidateId:    2,
+			CandidateId:    "192.168.1.2:32104",
 			LeaderTransfer: true,
 		},
 	}
@@ -397,12 +397,12 @@ func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigC
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}}
 
 	configChangeCmd := &ConfigChangeCmd{
-		Members: []Id{190152, 96775, 2344359, 99811, 56867},
+		Members: []Id{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"},
 	}
 
 	cmdReqMsg := Msg{
 		Tp:   Cmd,
-		From: Id(999),
+		From: Id("169.169.254.254:12345"),
 		To:   l.cfg.leader,
 		Payload: &CmdReq{
 			Cmd: configChangeCmd,
@@ -418,7 +418,7 @@ func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigC
 
 	// then payload
 	if appendLogReq, ok := res.Payload.(*AppendEntriesReq); ok {
-		c.Assert(configChangeCmd.PrevMembers, DeepEquals, []Id{-11203, 190152, -2534, 96775, 2344359})
+		c.Assert(configChangeCmd.PrevMembers, DeepEquals, []Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"})
 		c.Assert(appendLogReq.Entries, DeepEquals, []Entry{{Term: 1, Idx: 3, Cmd: configChangeCmd}})
 	} else {
 		c.Fail()
@@ -426,8 +426,8 @@ func (t *T) TestLeaderShouldReplaceConfigAndSaveOldConfigToLogWhenReceiveConfigC
 	}
 
 	// config changed
-	c.Assert(l.cfg.cluster.Me, Equals, Id(-11203))
-	c.Assert(l.cfg.cluster.Members, DeepEquals, []Id{190152, 96775, 2344359, 99811, 56867})
+	c.Assert(l.cfg.cluster.Me, Equals, Id("192.168.1.1:32104"))
+	c.Assert(l.cfg.cluster.Members, DeepEquals, []Id{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"})
 }
 
 func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChangeLogExist(c *C) {
@@ -437,16 +437,16 @@ func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChange
 	l.commitIndex = 1
 	l.lastApplied = 1
 	l.log = []Entry{{Term: 1, Idx: 1, Cmd: "1"}, {Term: 1, Idx: 2, Cmd: "2"}, {Term: 1, Idx: 3, Cmd: &ConfigChangeCmd{
-		Members: []Id{-11203, 190152, -2534, 96775, 2344359},
+		Members: []Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
 	}}}
 
 	configChangeCmd := &ConfigChangeCmd{
-		Members: []Id{-11203, 190152, -2534, 96775, 2344359, 56867},
+		Members: []Id{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104"},
 	}
 
 	cmdReqMsg := Msg{
 		Tp:   Cmd,
-		From: Id(999),
+		From: Id("169.169.254.254:12345"),
 		To:   l.cfg.leader,
 		Payload: &CmdReq{
 			Cmd: configChangeCmd,
@@ -469,8 +469,8 @@ func (t *T) TestLeaderShouldRejectConfigChangeCmdWhenSomeUncommittedConfigChange
 	}
 
 	// no change effected, no entry appended
-	c.Assert(l.cfg.cluster.Me, Equals, Id(-11203))
-	c.Assert(l.cfg.cluster.Members, DeepEquals, []Id{-11203, 190152, -2534, 96775, 2344359})
+	c.Assert(l.cfg.cluster.Me, Equals, Id("192.168.1.1:32104"))
+	c.Assert(l.cfg.cluster.Members, DeepEquals, []Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"})
 	c.Assert(l.getLastEntry().Idx, Equals, Index(3))
 }
 
@@ -531,7 +531,7 @@ func (t *T) TestLeaderShouldRejectAnyCmdIfInTransferFlagIsTrue(c *C) {
 
 	cmdReqMsg := Msg{
 		Tp:   Cmd,
-		From: Id(999),
+		From: Id("169.169.254.254:12345"),
 		To:   l.cfg.leader,
 		Payload: &CmdReq{
 			Cmd: "",
@@ -577,11 +577,11 @@ func (t *T) TestLeaderShouldSetInTransferFlagWhenLatestLeaderEvictionConfigChang
 	l.currentTerm = 2
 	l.commitIndex = 2
 	l.lastApplied = 2
-	l.cfg.cluster.Members = []Id{190152, -2534, 96775, 2344359}
+	l.cfg.cluster.Members = []Id{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}
 	l.log = []Entry{
 		{Term: 1, Idx: 1, Cmd: "1"},
 		{Term: 1, Idx: 2, Cmd: "2"},
-		{Term: 2, Idx: 3, Cmd: &ConfigChangeCmd{Members: []Id{190152, -2534, 96775, 2344359}}},
+		{Term: 2, Idx: 3, Cmd: &ConfigChangeCmd{Members: []Id{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}}},
 	}
 	l.matchIndex[l.cfg.cluster.Members[1]] = 2
 	l.nextIndex[l.cfg.cluster.Members[1]] = 3
