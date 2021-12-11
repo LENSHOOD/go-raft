@@ -106,6 +106,24 @@ func (r *router) register(svr *svr) {
 	r.svrOutputChs[svr.addr] = append(r.svrOutputChs[svr.addr], svr.reqOutputCh)
 }
 
+func (r *router) add(svrToAdd *svr) {
+	r.rw.Lock()
+	defer r.rw.Unlock()
+	for _, svr := range r.svrs {
+		ch := svr.mgr.Dispatcher.RegisterResp(svrToAdd.addr)
+		svr.respChs[svrToAdd.addr] = ch
+		r.svrOutputChs[svr.addr] = append(r.svrOutputChs[svr.addr], ch)
+	}
+
+	for _, svr := range r.svrs {
+		ch := svrToAdd.mgr.Dispatcher.RegisterResp(svr.addr)
+		svrToAdd.respChs[svr.addr] = ch
+		r.svrOutputChs[svrToAdd.addr] = append(r.svrOutputChs[svrToAdd.addr], ch)
+	}
+	r.svrOutputChs[svrToAdd.addr] = append(r.svrOutputChs[svrToAdd.addr], svrToAdd.reqOutputCh)
+	r.svrs[svrToAdd.addr] = svrToAdd
+}
+
 func (r *router) run() {
 	for _, svr := range r.svrs {
 		go svr.mgr.Run()
@@ -220,6 +238,10 @@ func getFollowers(svrs []*svr) []*svr {
 		}
 	}
 	return followers
+}
+
+func waitCandidate(c *C, svrToBeCandidate *svr) {
+	waitAllBecomeCandidate(c, []*svr{svrToBeCandidate})
 }
 
 func waitAllBecomeCandidate(c *C, svrs []*svr) {

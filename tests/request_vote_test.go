@@ -124,7 +124,7 @@ func (t *T) TestShorterCommittedLogHolderCanNeverBeLeader(c *C) {
 	_ = leader.mgr.Dispatcher.RegisterResp(mgr.Address(strOfI))
 
 	// hold one of followers
-	r.hold(followers[1])
+	r.hold(followers[0])
 
 	// run command
 	r.exec(leader, core.Command(strOfI), mgr.Address(strOfI))
@@ -158,7 +158,7 @@ func (t *T) TestShorterCommittedLogHolderCanNeverBeLeader(c *C) {
 	newLeader := waitLeader(c, svrs)
 
 	// the shorter log follower[1] will never become leader
-	c.Assert(newLeader, Not(Equals), followers[1])
+	c.Assert(newLeader, Not(Equals), followers[0])
 
 	close(r.done)
 	svr0.mgr.Stop()
