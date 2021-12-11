@@ -122,6 +122,8 @@ func (r *router) add(svrToAdd *svr) {
 	}
 	r.svrOutputChs[svrToAdd.addr] = append(r.svrOutputChs[svrToAdd.addr], svrToAdd.reqOutputCh)
 	r.svrs[svrToAdd.addr] = svrToAdd
+
+	go svrToAdd.mgr.Run()
 }
 
 func (r *router) run() {

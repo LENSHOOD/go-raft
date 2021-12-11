@@ -117,7 +117,7 @@ func (d *dispatcher) dispatch(rpc *Rpc) {
 	}()
 
 	switch rpc.Payload.(type) {
-	case *core.AppendEntriesReq, *core.RequestVoteReq:
+	case *core.AppendEntriesReq, *core.RequestVoteReq, *core.TimeoutNowReq:
 		if d.reqOutput != nil {
 			d.reqOutput <- rpc
 		} else {

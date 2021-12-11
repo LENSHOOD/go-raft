@@ -27,7 +27,6 @@ func (t *T) TestAddServerThenRemoveServer(c *C) {
 	// build new svr to be added
 	svr3 := newSvr(3, 0)
 	r.add(svr3)
-	go svr3.mgr.Run()
 	r.rerun()
 
 	r.changeSvr(leader, &mgr.ConfigChange{Op: mgr.Add, Server: svr3.addr}, "c")
@@ -70,4 +69,55 @@ func (t *T) TestAddServerThenRemoveServer(c *C) {
 	svr1.mgr.Stop()
 	svr2.mgr.Stop()
 	svr3.mgr.Stop()
+}
+
+func (t *T) TestTransferLeadership(c *C) {
+	r := newRouter()
+
+	svr0 := newSvr(0, 5)
+	r.register(svr0)
+	svr1 := newSvr(1, 5)
+	r.register(svr1)
+	svr2 := newSvr(2, 5)
+	r.register(svr2)
+	svr3 := newSvr(3, 5)
+	r.register(svr3)
+	svr4 := newSvr(4, 5)
+	r.register(svr4)
+	svrs := []*svr{svr0, svr1, svr2, svr3, svr4}
+
+	go r.run()
+
+	leader := waitLeader(c, svrs)
+	r.exec(leader, "1", "a")
+	r.exec(leader, "2", "b")
+
+	// remove leader
+	r.changeSvr(leader, &mgr.ConfigChange{Op: mgr.Remove, Server: leader.addr}, "c")
+
+	// wait leader apply all
+	waitNumOfSvrLogLength(c, svrs, 3, 5)
+
+	var expectCurrLeader []*svr
+	for _, svr := range svrs {
+		if svr == leader {
+			continue
+		}
+
+		expectCurrLeader = append(expectCurrLeader, svr)
+	}
+
+	newLeader := leader
+	for newLeader == leader {
+		newLeader = waitLeader(c, expectCurrLeader)
+	}
+
+	c.Assert(len(newLeader.mgr.GetConfig().Others), Equals, 3)
+
+	close(r.done)
+	svr0.mgr.Stop()
+	svr1.mgr.Stop()
+	svr2.mgr.Stop()
+	svr3.mgr.Stop()
+	svr4.mgr.Stop()
 }
