@@ -12,8 +12,8 @@ const (
 
 type Msg struct {
 	Tp      MsgType
-	From    Id
-	To      Id
+	From    Address
+	To      Address
 	Payload interface{}
 }
 
@@ -25,7 +25,7 @@ type TermHolder interface {
 
 type RequestVoteReq struct {
 	Term           Term
-	CandidateId    Id
+	CandidateId    Address
 	LastLogIndex   Index
 	LastLogTerm    Term
 	LeaderTransfer bool
@@ -46,7 +46,7 @@ func (th *RequestVoteResp) GetTerm() Term {
 
 type AppendEntriesReq struct {
 	Term         Term
-	LeaderId     Id
+	LeaderId     Address
 	PrevLogIndex Index
 	PrevLogTerm  Term
 	Entries      []Entry
@@ -75,9 +75,17 @@ type CmdResp struct {
 	Success bool
 }
 
+// ConfigChangeCmd save the current and previous config snapshot
+//     The main reason of not use rpc like {Op: Add/Remove, Address: "some-addr"}
+// is that:
+//
+//     ConfigChangeCmd act as an Entry to replicate self all across the cluster,
+// we can hardly to maintain this special Entry will be applied only once (unlike
+// other Entries, ConfigChangeCmd must apply before commit). Obviously stateless
+// cmd is more robust than stateful. (just like declarative vs. imperative)
 type ConfigChangeCmd struct {
-	Members     []Id
-	PrevMembers []Id
+	Members     []Address
+	PrevMembers []Address
 }
 
 type TimeoutNowReq struct {

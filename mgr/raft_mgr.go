@@ -14,10 +14,9 @@ import (
 
 var logger = log.Default()
 
-type Address string
 type Rpc struct {
 	Ctx     context.Context
-	Addr    Address
+	Addr    core.Address
 	Payload interface{}
 }
 
@@ -30,26 +29,16 @@ const (
 
 type ConfigChange struct {
 	Op     ConfigOp
-	Server Address
+	Server core.Address
 }
 
 type Config struct {
-	Me                   Address
-	Others               []Address
+	Me                   core.Address
+	Others               []core.Address
 	TickIntervalMilliSec int64
 	ElectionTimeoutMin   int64
 	ElectionTimeoutMax   int64
 	DebugMode            bool
-}
-
-type addrIdMapper struct{}
-
-func (aim *addrIdMapper) getIdByAddr(addr Address) core.Id {
-	return core.Id(addr)
-}
-
-func (aim *addrIdMapper) getAddrById(id core.Id) (Address, bool) {
-	return Address(id), true
 }
 
 type switcher struct {
@@ -93,7 +82,7 @@ func (d *dispatcher) RegisterReq(ch chan<- *Rpc) {
 	d.reqOutput = ch
 }
 
-func (d *dispatcher) RegisterResp(addr Address) <-chan *Rpc {
+func (d *dispatcher) RegisterResp(addr core.Address) <-chan *Rpc {
 	ch := make(chan *Rpc)
 	ret, loaded := d.respOutputs.LoadOrStore(addr, ch)
 	if loaded {
@@ -102,7 +91,7 @@ func (d *dispatcher) RegisterResp(addr Address) <-chan *Rpc {
 	return ret.(chan *Rpc)
 }
 
-func (d *dispatcher) Cancel(addr Address) {
+func (d *dispatcher) Cancel(addr core.Address) {
 	ch, loaded := d.respOutputs.LoadAndDelete(addr)
 	if loaded {
 		close(ch.(chan *Rpc))
@@ -176,11 +165,10 @@ func NewDefaultTicker(d time.Duration) *defaultTicker {
 }
 
 type RaftManager struct {
-	obj    core.RaftObject
-	input  chan *Rpc
-	ticker Ticker
-	cfg    Config
-	addrIdMapper
+	obj        core.RaftObject
+	input      chan *Rpc
+	ticker     Ticker
+	cfg        Config
 	switcher   switcher
 	Dispatcher dispatcher
 }
@@ -224,8 +212,8 @@ func (m *RaftManager) Run() {
 
 			res = m.obj.TakeAction(core.Msg{
 				Tp:      tp,
-				From:    m.getIdByAddr(req.Addr),
-				To:      m.getIdByAddr(m.cfg.Me),
+				From:    req.Addr,
+				To:      m.cfg.Me,
 				Payload: req.Payload,
 			})
 			span.Finish()
@@ -245,7 +233,7 @@ func (m *RaftManager) Run() {
 			case core.Rpc:
 				if resp, ok := res.Payload.(*core.CmdResp); ok && !resp.Success {
 					// if no leader elected yet, return self address to let client give another try
-					if leaderId, ok := resp.Result.(core.Id); ok && leaderId == core.InvalidId {
+					if leaderId, ok := resp.Result.(core.Address); ok && leaderId == core.InvalidId {
 						resp.Result = m.cfg.Me
 					}
 				}
@@ -258,16 +246,7 @@ func (m *RaftManager) Run() {
 	}
 }
 
-func (m *RaftManager) sendTo(ctx context.Context, to core.Id, payload interface{}) {
-	buildRpc := func(ctx context.Context, to core.Id, payload interface{}) *Rpc {
-		if addr, exist := m.getAddrById(to); exist {
-			return &Rpc{ctx, addr, payload}
-		}
-
-		logger.Fatalf("dest not exist, id: %s", to)
-		return nil
-	}
-
+func (m *RaftManager) sendTo(ctx context.Context, to core.Address, payload interface{}) {
 	dispatch := func(rpc *Rpc) {
 		if rpc == nil {
 			return
@@ -289,10 +268,10 @@ func (m *RaftManager) sendTo(ctx context.Context, to core.Id, payload interface{
 		}
 	case core.Composed:
 		for _, msg := range payload.([]core.Msg) {
-			dispatch(buildRpc(ctx, msg.To, msg.Payload))
+			dispatch(&Rpc{ctx, msg.To, msg.Payload})
 		}
 	default:
-		dispatch(buildRpc(ctx, to, payload))
+		dispatch(&Rpc{ctx, to, payload})
 	}
 }
 
@@ -302,12 +281,8 @@ func (m *RaftManager) Stop() {
 }
 
 func (m *RaftManager) updateCluster(cls core.Cluster) {
-	var others []Address
-	for _, id := range cls.Members {
-		addr, exist := m.getAddrById(id)
-		if !exist {
-			log.Fatalf("Cluster server not found, id %s.", id)
-		}
+	var others []core.Address
+	for _, addr := range cls.Members {
 		if addr != m.cfg.Me {
 			others = append(others, addr)
 		}
@@ -318,8 +293,8 @@ func (m *RaftManager) updateCluster(cls core.Cluster) {
 
 func (m *RaftManager) convertConfigChangeToCmd(cc *ConfigChange) core.Command {
 	currMember := m.obj.GetCluster().Members
-	newMember := make([]core.Id, 0)
-	givenId := m.getIdByAddr(cc.Server)
+	newMember := make([]core.Address, 0)
+	givenId := cc.Server
 
 	switch cc.Op {
 	case Add:
@@ -383,11 +358,11 @@ func NewRaftMgrWithTicker(cfg Config, sm core.StateMachine, inputCh chan *Rpc, t
 
 	// build cluster with id
 	cls := core.Cluster{
-		Me: mgr.getIdByAddr(cfg.Me),
+		Me: cfg.Me,
 	}
 	cls.Members = append(cls.Members, cls.Me)
 	for _, addr := range cfg.Others {
-		cls.Members = append(cls.Members, mgr.getIdByAddr(addr))
+		cls.Members = append(cls.Members, addr)
 	}
 
 	if ticker == nil {

@@ -46,7 +46,7 @@ func (s *RaftServer) serve(ctx context.Context, inPayload interface{}) (outPaylo
 		log.Fatalf("no peer")
 	}
 
-	addr := mgr.Address(p.Addr.String())
+	addr := core.Address(p.Addr.String())
 	outputCh := s.mgr.Dispatcher.RegisterResp(addr)
 	s.inputCh <- &mgr.Rpc{
 		Ctx:     ctx,

@@ -4,13 +4,13 @@ import (
 	"math/rand"
 )
 
-type Id string
+type Address string
 
-const InvalidId Id = "InvalidId"
+const InvalidId Address = "InvalidId"
 
-const All Id = "All"
+const All Address = "All"
 
-const Composed Id = "Composed"
+const Composed Address = "Composed"
 
 // InvalidTerm is the init value of term, which will become 1 after first follower turn to candidate.
 const InvalidTerm Term = 0
@@ -35,8 +35,8 @@ type RaftObject interface {
 }
 
 type Cluster struct {
-	Me      Id
-	Members []Id
+	Me      Address
+	Members []Address
 }
 
 // meetMajority check whether the given cnt is meet majority count
@@ -56,13 +56,13 @@ func (c *Cluster) meetMajority(cnt int) bool {
 	return realCount >= len(c.Members)/2+1
 }
 
-func (c *Cluster) replaceTo(newMembers []Id) {
+func (c *Cluster) replaceTo(newMembers []Address) {
 	c.Members = newMembers
 }
 
 type Config struct {
 	cluster            Cluster
-	leader             Id
+	leader             Address
 	electionTimeoutMin int64
 	electionTimeoutMax int64
 	electionTimeout    int64
@@ -83,7 +83,7 @@ func InitConfig(cls Cluster, eleTimeoutMin int64, eleTimeoutMax int64) Config {
 type RaftBase struct {
 	cfg         Config
 	currentTerm Term
-	votedFor    Id
+	votedFor    Address
 	commitIndex Index
 	lastApplied Index
 	log         []Entry
@@ -109,7 +109,7 @@ func (r *RaftBase) moveState(to RaftObject) Msg {
 	}
 }
 
-func (r *RaftBase) Resp(to Id, payload interface{}) Msg {
+func (r *RaftBase) Resp(to Address, payload interface{}) Msg {
 	return Msg{
 		Tp:      Rpc,
 		From:    r.cfg.cluster.Me,
@@ -118,7 +118,7 @@ func (r *RaftBase) Resp(to Id, payload interface{}) Msg {
 	}
 }
 
-func (r *RaftBase) pointReq(dest Id, payload interface{}) Msg {
+func (r *RaftBase) pointReq(dest Address, payload interface{}) Msg {
 	return Msg{
 		Tp:      Rpc,
 		From:    r.cfg.cluster.Me,
@@ -131,7 +131,7 @@ func (r *RaftBase) broadcastReq(payload interface{}) Msg {
 	return r.pointReq(All, payload)
 }
 
-func (r *RaftBase) composedReq(toSet []Id, payloadSupplier func(to Id) interface{}) Msg {
+func (r *RaftBase) composedReq(toSet []Address, payloadSupplier func(to Address) interface{}) Msg {
 	var msgs []Msg
 	for _, to := range toSet {
 		msgs = append(msgs, r.pointReq(to, payloadSupplier(to)))

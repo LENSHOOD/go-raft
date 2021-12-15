@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/LENSHOOD/go-raft/core"
 	"github.com/LENSHOOD/go-raft/mgr"
 	. "gopkg.in/check.v1"
 	"time"
@@ -36,10 +37,10 @@ func (t *T) TestAddServerThenRemoveServer(c *C) {
 	waitNumOfSvrLogLength(c, svrsOf4, 3, 4)
 	time.Sleep(time.Second)
 
-	c.Assert(svr0.mgr.GetConfig().Others, DeepEquals, []mgr.Address{svr1.addr, svr2.addr, svr3.addr})
-	c.Assert(svr1.mgr.GetConfig().Others, DeepEquals, []mgr.Address{svr0.addr, svr2.addr, svr3.addr})
-	c.Assert(svr2.mgr.GetConfig().Others, DeepEquals, []mgr.Address{svr0.addr, svr1.addr, svr3.addr})
-	c.Assert(svr3.mgr.GetConfig().Others, DeepEquals, []mgr.Address{svr0.addr, svr1.addr, svr2.addr})
+	c.Assert(svr0.mgr.GetConfig().Others, DeepEquals, []core.Address{svr1.addr, svr2.addr, svr3.addr})
+	c.Assert(svr1.mgr.GetConfig().Others, DeepEquals, []core.Address{svr0.addr, svr2.addr, svr3.addr})
+	c.Assert(svr2.mgr.GetConfig().Others, DeepEquals, []core.Address{svr0.addr, svr1.addr, svr3.addr})
+	c.Assert(svr3.mgr.GetConfig().Others, DeepEquals, []core.Address{svr0.addr, svr1.addr, svr2.addr})
 
 	// remove a follower
 	followerToBeRemoved := getFollowers(svrsOf4)[0]

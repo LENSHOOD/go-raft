@@ -24,7 +24,7 @@ func (t *T) TestFollowerVoteWithInit(c *C) {
 	voteResp := res.Payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(1))
 	c.Assert(voteResp.VoteGranted, Equals, true)
-	c.Assert(f.votedFor, Equals, Id("192.168.1.2:32104"))
+	c.Assert(f.votedFor, Equals, Address("192.168.1.2:32104"))
 }
 
 func (t *T) TestFollowerNotVoteWhenCandidateHoldSmallerTerms(c *C) {
@@ -122,7 +122,7 @@ func (t *T) TestFollowerVoteWithLeaderExistButLeaderTransferReq(c *C) {
 	voteResp := res.Payload.(*RequestVoteResp)
 	c.Assert(voteResp.Term, Equals, Term(1))
 	c.Assert(voteResp.VoteGranted, Equals, true)
-	c.Assert(f.votedFor, Equals, Id("192.168.1.2:32104"))
+	c.Assert(f.votedFor, Equals, Address("192.168.1.2:32104"))
 }
 
 func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
@@ -145,7 +145,7 @@ func (t *T) TestFollowerReVoteWhenBiggerTermReceived(c *C) {
 	// then
 	c.Assert(res.Tp, Equals, Rpc)
 	voteResp := res.Payload.(*RequestVoteResp)
-	c.Assert(f.votedFor, Equals, Id("192.168.1.3:32104"))
+	c.Assert(f.votedFor, Equals, Address("192.168.1.3:32104"))
 	c.Assert(voteResp.Term, Equals, Term(2))
 	c.Assert(voteResp.VoteGranted, Equals, true)
 }
@@ -536,14 +536,14 @@ func (t *T) TestFollowerShouldReturnLeaderAddressWhenReceiveCmdRequest(c *C) {
 	c.Assert(res.Tp, Equals, Rpc)
 	cmdResp := res.Payload.(*CmdResp)
 	c.Assert(cmdResp.Success, Equals, false)
-	cmdResult := cmdResp.Result.(Id)
+	cmdResult := cmdResp.Result.(Address)
 	c.Assert(cmdResult, Equals, f.cfg.leader)
 }
 
 func (t *T) TestFollowerShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
 	// given
 	configChangeCmd := &ConfigChangeCmd{
-		Members: []Id{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"},
+		Members: []Address{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"},
 	}
 
 	req := Msg{
@@ -574,21 +574,21 @@ func (t *T) TestFollowerShouldReplaceConfigWhenReceiveConfigChangeLog(c *C) {
 	c.Assert(f.log[len(f.log)-1].Cmd, Equals, configChangeCmd)
 
 	// config should be merged
-	c.Assert(f.cfg.cluster.Me, Equals, Id("192.168.1.1:32104"))
-	c.Assert(f.cfg.cluster.Members, DeepEquals, []Id{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"})
+	c.Assert(f.cfg.cluster.Me, Equals, Address("192.168.1.1:32104"))
+	c.Assert(f.cfg.cluster.Members, DeepEquals, []Address{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"})
 }
 
 func (t *T) TestFollowerShouldRollbackConfigWhenUncommittedConfigChangeLogOverrideByLeader(c *C) {
 	// given
 	f := NewFollower(commCfg, mockSm)
-	f.cfg.cluster.Members = []Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}
+	f.cfg.cluster.Members = []Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}
 	f.currentTerm = 2
 	f.commitIndex = 2
 
 	// Log (term:idx): 1:1 1:2 2:3 2:4--[config change]
 	configChangeCmd := &ConfigChangeCmd{
-		Members:     []Id{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"},
-		PrevMembers: []Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
+		Members:     []Address{"192.168.1.1:32104", "192.168.2.2:32104", "192.168.2.3:32104", "192.168.2.4:32104", "192.168.2.5:32104"},
+		PrevMembers: []Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
 	}
 	f.log = append(f.log, Entry{Term: 1, Idx: 1, Cmd: ""}, Entry{Term: 1, Idx: 2, Cmd: ""},
 		Entry{Term: 2, Idx: 3, Cmd: ""}, Entry{Term: 2, Idx: 4, Cmd: configChangeCmd})
@@ -615,8 +615,8 @@ func (t *T) TestFollowerShouldRollbackConfigWhenUncommittedConfigChangeLogOverri
 	c.Assert(f.log[len(f.log)-1].Idx, Equals, Index(3))
 
 	// config should be rolled back
-	c.Assert(f.cfg.cluster.Me, Equals, Id("192.168.1.1:32104"))
-	c.Assert(f.cfg.cluster.Members, DeepEquals, []Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"})
+	c.Assert(f.cfg.cluster.Me, Equals, Address("192.168.1.1:32104"))
+	c.Assert(f.cfg.cluster.Members, DeepEquals, []Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"})
 }
 
 func (t *T) TestFollowerTriggerElectionTimeoutWhenReceiveTimeoutNowRequest(c *C) {

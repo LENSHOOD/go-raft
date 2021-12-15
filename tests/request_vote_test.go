@@ -121,13 +121,13 @@ func (t *T) TestShorterCommittedLogHolderCanNeverBeLeader(c *C) {
 	// follower0 log: (empty)
 	// follower1 log: (empty)
 	strOfI := strconv.Itoa(999)
-	_ = leader.mgr.Dispatcher.RegisterResp(mgr.Address(strOfI))
+	_ = leader.mgr.Dispatcher.RegisterResp(core.Address(strOfI))
 
 	// hold one of followers
 	r.hold(followers[0])
 
 	// run command
-	r.exec(leader, core.Command(strOfI), mgr.Address(strOfI))
+	r.exec(leader, core.Command(strOfI), core.Address(strOfI))
 
 	// let first entry committed
 	waitNumOfSvrLogLength(c, svrs, 1, 2)

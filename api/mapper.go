@@ -53,7 +53,7 @@ func MapToAppendEntriesReq(from *AppendEntriesArguments) (to *core.AppendEntries
 
 	return &core.AppendEntriesReq{
 		Term:         core.Term(from.Term),
-		LeaderId:     core.Id(from.LeaderId),
+		LeaderId:     core.Address(from.LeaderId),
 		PrevLogIndex: core.Index(from.PrevLogIndex),
 		PrevLogTerm:  core.Term(from.PrevLogTerm),
 		Entries:      mapToRaftEntries(from.Entries),
@@ -105,7 +105,7 @@ func MapToRequestVoteReq(from *RequestVoteArguments) (to *core.RequestVoteReq) {
 
 	return &core.RequestVoteReq{
 		Term:         core.Term(from.Term),
-		CandidateId:  core.Id(from.CandidateId),
+		CandidateId:  core.Address(from.CandidateId),
 		LastLogIndex: core.Index(from.LastLogIndex),
 		LastLogTerm:  core.Term(from.LastLogTerm),
 	}

@@ -43,7 +43,7 @@ func (t *T) TestCandidateWillRecordVoteFromOtherResp(c *C) {
 	cand := NewFollower(commCfg, mockSm).toCandidate(false)
 	cand.currentTerm = 1
 
-	buildResp := func(id Id) Msg {
+	buildResp := func(id Address) Msg {
 		return Msg{
 			Tp:   Rpc,
 			From: id,
@@ -252,7 +252,7 @@ func (t *T) TestCandidateForwardToLeaderWhenReceiveMajorityVotes(c *C) {
 		Entry{Term: 3, Idx: 3, Cmd: ""}, Entry{Term: 3, Idx: 4, Cmd: ""},
 		Entry{Term: 3, Idx: 5, Cmd: ""})
 
-	buildResp := func(id Id) Msg {
+	buildResp := func(id Address) Msg {
 		return Msg{
 			Tp:   Rpc,
 			From: id,

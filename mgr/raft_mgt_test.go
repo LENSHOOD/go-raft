@@ -27,7 +27,7 @@ var mockSm = &mockStateMachine{}
 
 var cfg = Config{
 	Me:                   "192.168.1.1:32104",
-	Others:               []Address{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
+	Others:               []core.Address{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
 	TickIntervalMilliSec: 30,
 	ElectionTimeoutMin:   10,
 	ElectionTimeoutMax:   50,
@@ -55,7 +55,7 @@ func (f *fakeRaftObject) GetCluster() core.Cluster {
 }
 
 var standardCluster = core.Cluster{Me: "192.168.1.1:32104",
-	Members: []core.Id{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}}
+	Members: []core.Address{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}}
 
 func (t *T) TestTick(c *C) {
 	// given
@@ -113,7 +113,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 	mgr.obj = mockObj
 
 	// when
-	addr := Address("addr")
+	addr := core.Address("addr")
 	outputCh := mgr.Dispatcher.RegisterResp(addr)
 	rpc := &Rpc{Ctx: context.TODO(), Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
 	inputCh <- rpc
@@ -144,7 +144,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 	mgr.obj = mockObj
 
 	// when
-	addr := Address("addr")
+	addr := core.Address("addr")
 	rpc := &Rpc{Ctx: context.TODO(), Addr: addr, Payload: core.AppendEntriesReq{Term: 10}}
 	inputCh <- rpc
 	go mgr.Run()
@@ -189,17 +189,17 @@ func (t *T) TestDispatcherShouldDispatchRespToRelatedChannel(c *C) {
 	// given
 	d := dispatcher{}
 
-	addr1 := Address("addr1")
+	addr1 := core.Address("addr1")
 	rpc1 := Rpc{Ctx: context.TODO(), Addr: addr1, Payload: &core.AppendEntriesResp{}}
 
-	addr2 := Address("addr1")
+	addr2 := core.Address("addr1")
 	rpc2 := Rpc{Ctx: context.TODO(), Addr: addr2, Payload: &core.RequestVoteResp{}}
 
-	addr3 := Address("addr1")
+	addr3 := core.Address("addr1")
 	rpc3 := Rpc{Ctx: context.TODO(), Addr: addr3, Payload: &core.CmdResp{}}
 
 	// when
-	assertDispatch := func(addr Address, rpc *Rpc) {
+	assertDispatch := func(addr core.Address, rpc *Rpc) {
 		ch := d.RegisterResp(addr)
 		go d.dispatch(rpc)
 
@@ -224,7 +224,7 @@ func (t *T) TestDispatcherShouldDispatchReqToRelatedChannel(c *C) {
 	d := dispatcher{}
 	reqCh := make(chan *Rpc, 3)
 
-	addr := Address("addr")
+	addr := core.Address("addr")
 	rpc1 := Rpc{Ctx: context.TODO(), Addr: addr, Payload: &core.AppendEntriesReq{}}
 	rpc2 := Rpc{Ctx: context.TODO(), Addr: addr, Payload: &core.RequestVoteReq{}}
 
@@ -294,7 +294,7 @@ func (t *T) TestRaftMgrShouldReturnSelfAddressWhenReceiveFalseCmdRespWithInvalid
 	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
-	clientAddr := Address("addr")
+	clientAddr := core.Address("addr")
 	respCh := mgr.Dispatcher.RegisterResp(clientAddr)
 
 	// when
@@ -324,10 +324,10 @@ func (t *T) TestConfigChangeAddServerWillBeConvertToConfigChangeCmd(c *C) {
 	mockObj := new(fakeRaftObject)
 	mockObj.
 		On("GetCluster", mock.Anything).
-		Return(core.Cluster{Me: "192.168.1.1:32104", Members: []core.Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}})
+		Return(core.Cluster{Me: "192.168.1.1:32104", Members: []core.Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}})
 	mgr.obj = mockObj
 
-	serverToAdd := Address("192.168.1.6:32104")
+	serverToAdd := core.Address("192.168.1.6:32104")
 
 	// when
 	cc := &ConfigChange{Op: Add, Server: serverToAdd}
@@ -335,7 +335,7 @@ func (t *T) TestConfigChangeAddServerWillBeConvertToConfigChangeCmd(c *C) {
 
 	// then
 	if resp, ok := cmd.(*core.ConfigChangeCmd); ok {
-		c.Assert(resp.Members, DeepEquals, []core.Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104", "192.168.1.6:32104"})
+		c.Assert(resp.Members, DeepEquals, []core.Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104", "192.168.1.6:32104"})
 	} else {
 		c.Fail()
 		c.Logf("Payload should be ConfigChangeCmd")
@@ -349,10 +349,10 @@ func (t *T) TestConfigChangeRemoveServerWillBeConvertToConfigChangeCmd(c *C) {
 	mockObj := new(fakeRaftObject)
 	mockObj.
 		On("GetCluster", mock.Anything).
-		Return(core.Cluster{Me: "192.168.1.1:32104", Members: []core.Id{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}})
+		Return(core.Cluster{Me: "192.168.1.1:32104", Members: []core.Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"}})
 	mgr.obj = mockObj
 
-	serverToRemove := Address("192.168.1.1:32104")
+	serverToRemove := core.Address("192.168.1.1:32104")
 
 	// when
 	cc := &ConfigChange{Op: Remove, Server: serverToRemove}
@@ -360,7 +360,7 @@ func (t *T) TestConfigChangeRemoveServerWillBeConvertToConfigChangeCmd(c *C) {
 
 	// then
 	if resp, ok := cmd.(*core.ConfigChangeCmd); ok {
-		c.Assert(resp.Members, DeepEquals, []core.Id{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"})
+		c.Assert(resp.Members, DeepEquals, []core.Address{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"})
 	} else {
 		c.Fail()
 		c.Logf("Payload should be ConfigChangeCmd")

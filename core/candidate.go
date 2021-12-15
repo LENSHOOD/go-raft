@@ -6,7 +6,7 @@ import (
 
 type Candidate struct {
 	RaftBase
-	voted          map[Id]bool
+	voted          map[Address]bool
 	leaderTransfer bool
 }
 
@@ -94,7 +94,7 @@ func NewCandidate(f *Follower, leaderTransfer bool) *Candidate {
 			log:         f.log,
 			sm:          f.sm,
 		},
-		make(map[Id]bool),
+		make(map[Address]bool),
 		leaderTransfer,
 	}
 

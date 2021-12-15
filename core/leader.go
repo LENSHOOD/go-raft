@@ -3,15 +3,15 @@ package core
 var heartbeatDivideFactor int64 = 2
 
 type clientCtx struct {
-	clientId Id
+	clientId Address
 }
 
 type Leader struct {
 	RaftBase
 	heartbeatIntervalCnt int64
 	clientCtxs           map[Index]clientCtx
-	nextIndex            map[Id]Index
-	matchIndex           map[Id]Index
+	nextIndex            map[Address]Index
+	matchIndex           map[Address]Index
 	inTransfer           bool
 }
 
@@ -91,7 +91,7 @@ func (l *Leader) sendHeartbeat() Msg {
 	})
 }
 
-func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
+func (l *Leader) appendLogFromCmd(from Address, cmd Command) Msg {
 	if l.inTransfer {
 		// TODO: format result, should not return nil
 		return l.pointReq(from, &CmdResp{Result: nil, Success: false})
@@ -110,7 +110,7 @@ func (l *Leader) appendLogFromCmd(from Id, cmd Command) Msg {
 		}
 
 		// save previous member in case of roll back
-		configChangedCmd.PrevMembers = make([]Id, len(l.cfg.cluster.Members))
+		configChangedCmd.PrevMembers = make([]Address, len(l.cfg.cluster.Members))
 		_ = copy(configChangedCmd.PrevMembers, l.cfg.cluster.Members)
 
 		l.cfg.cluster.replaceTo(configChangedCmd.Members)
@@ -186,8 +186,8 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 	// (if received previous entry that replicated to majority, then that entry will be committed
 	// right after first current term entry committed)
 	currFollowerMatchedTerm := l.getEntryByIdx(currFollowerMatchedIdx).Term
-	var idSet []Id
-	payloadMap := make(map[Id]interface{})
+	var idSet []Address
+	payloadMap := make(map[Address]interface{})
 	if l.cfg.cluster.meetMajority(majorityCnt) && currFollowerMatchedTerm == l.currentTerm {
 		// send resp only if there is a not-yet-response cmd req existed
 		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
@@ -213,12 +213,12 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 		return NullMsg
 	}
 
-	return l.composedReq(idSet, func(to Id) interface{} {
+	return l.composedReq(idSet, func(to Address) interface{} {
 		return &CmdResp{Result: payloadMap[to], Success: true}
 	})
 }
 
-func (l *Leader) resendAppendLogWithDecreasedIdx(followerId Id) Msg {
+func (l *Leader) resendAppendLogWithDecreasedIdx(followerId Address) Msg {
 	stepBackedNextIdx := l.nextIndex[followerId] - 1
 	l.nextIndex[followerId] = stepBackedNextIdx
 
@@ -280,8 +280,8 @@ func NewLeader(c *Candidate) *Leader {
 		},
 		0,
 		make(map[Index]clientCtx),
-		make(map[Id]Index),
-		make(map[Id]Index),
+		make(map[Address]Index),
+		make(map[Address]Index),
 		false,
 	}
 

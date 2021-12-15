@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/LENSHOOD/go-raft/api"
+	"github.com/LENSHOOD/go-raft/core"
 	"github.com/LENSHOOD/go-raft/mgr"
 	"github.com/LENSHOOD/go-raft/state_machine"
 	"github.com/LENSHOOD/go-raft/tracer"
@@ -23,13 +24,13 @@ func main() {
 	eleMin := flag.Int64("eleMin", 100, "min election timeout as n*tick, -eleMin=[n], default: 1000ms")
 	flag.Parse()
 
-	var others []mgr.Address
+	var others []core.Address
 	fieldsFunc := strings.FieldsFunc(*othersStr, func(r rune) bool { return r == ',' })
 	for _, v := range fieldsFunc {
-		others = append(others, mgr.Address(strings.TrimSpace(v)))
+		others = append(others, core.Address(strings.TrimSpace(v)))
 	}
 	config := mgr.Config{
-		Me:                   mgr.Address(*me),
+		Me:                   core.Address(*me),
 		Others:               others,
 		TickIntervalMilliSec: *tick,
 		ElectionTimeoutMax:   *eleMax,
