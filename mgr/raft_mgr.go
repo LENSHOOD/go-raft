@@ -294,18 +294,18 @@ func (m *RaftManager) updateCluster(cls core.Cluster) {
 func (m *RaftManager) convertConfigChangeToCmd(cc *ConfigChange) core.Command {
 	currMember := m.obj.GetCluster().Members
 	newMember := make([]core.Address, 0)
-	givenId := cc.Server
+	givenSvr := cc.Server
 
 	switch cc.Op {
 	case Add:
-		newMember = append(append(newMember, currMember...), givenId)
+		newMember = append(append(newMember, currMember...), givenSvr)
 	case Remove:
-		for _, id := range currMember {
-			if id == givenId {
+		for _, addr := range currMember {
+			if addr == givenSvr {
 				continue
 			}
 
-			newMember = append(newMember, id)
+			newMember = append(newMember, addr)
 		}
 	}
 

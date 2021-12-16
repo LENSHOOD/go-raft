@@ -115,21 +115,7 @@ func (l *Leader) appendLogFromCmd(from Address, cmd Command) Msg {
 
 		l.cfg.cluster.replaceTo(configChangedCmd.Members)
 
-		// found add server, init nextIndex and matchIndex
-		if len(configChangedCmd.Members) > len(configChangedCmd.PrevMembers) {
-			for _, member := range configChangedCmd.Members {
-				for _, prevMember := range configChangedCmd.PrevMembers {
-					if member != prevMember {
-						// lastEntry.Idx + 2 count this config change entry in
-						l.nextIndex[member] = lastEntry.Idx + 2
-						l.matchIndex[member] = InvalidIndex
-						break
-					}
-				}
-			}
-		}
-
-		// TODO: found removed server, delete related nextIndex and matchIndex
+		l.maintainNextAndMatchIdxForChangedServer(configChangedCmd, lastEntry.Idx)
 	}
 
 	newEntry := Entry{
@@ -148,6 +134,26 @@ func (l *Leader) appendLogFromCmd(from Address, cmd Command) Msg {
 		Entries:      []Entry{newEntry},
 		LeaderCommit: l.commitIndex,
 	})
+}
+
+func (l *Leader) maintainNextAndMatchIdxForChangedServer(configChangedCmd *ConfigChangeCmd, lastIdx Index) {
+	// when add new server, init nextIndex and matchIndex to that server
+	if len(configChangedCmd.Members) > len(configChangedCmd.PrevMembers) {
+		hashSet := make(map[Address]struct{})
+		for _, member := range configChangedCmd.PrevMembers {
+			hashSet[member] = struct{}{}
+		}
+		for _, member := range configChangedCmd.Members {
+			if _, exist := hashSet[member]; !exist {
+				// lastEntry.Idx + 2 count this config change entry in
+				l.nextIndex[member] = lastIdx + 2
+				l.matchIndex[member] = InvalidIndex
+				break
+			}
+		}
+	}
+
+	// TODO: found removed server, delete related nextIndex and matchIndex
 }
 
 func (l *Leader) toFollower() *Follower {
@@ -189,8 +195,9 @@ func (l *Leader) dealWithAppendLogResp(msg Msg) Msg {
 	var idSet []Address
 	payloadMap := make(map[Address]interface{})
 	if l.cfg.cluster.meetMajority(majorityCnt) && currFollowerMatchedTerm == l.currentTerm {
-		// send resp only if there is a not-yet-response cmd req existed
+		// send resp only if there is a not-yet-respond cmd req existed
 		for i := l.commitIndex + 1; i <= currFollowerMatchedIdx; i++ {
+			// when config change lead to self eviction
 			if _, ok := l.getEntryByIdx(i).Cmd.(*ConfigChangeCmd); ok && !l.isMeIncludedInCluster() {
 				l.inTransfer = true
 			}
