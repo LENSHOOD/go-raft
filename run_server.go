@@ -18,20 +18,24 @@ import (
 func main() {
 	// cfg
 	me := flag.String("me", ":34220", "self addr, -me=[ip:port], default: 127.0.0.1:34220")
-	othersStr := flag.String("others", "", "other cluster servers addr, -others=[ip1:port1, ip2:port2, ...]")
+	all := flag.String("all", "", "all cluster servers addr, -others=[ip1:port1, ip2:port2, ...]")
 	tick := flag.Int64("tick", 10, "tick interval as millisecond, -tick=[ms], default: 10ms")
 	eleMax := flag.Int64("eleMax", 300, "max election timeout as n*tick, -eleMax=[n], default: 3000ms")
 	eleMin := flag.Int64("eleMin", 100, "min election timeout as n*tick, -eleMin=[n], default: 1000ms")
 	flag.Parse()
 
-	var others []core.Address
-	fieldsFunc := strings.FieldsFunc(*othersStr, func(r rune) bool { return r == ',' })
+	var members []core.Address
+	fieldsFunc := strings.FieldsFunc(*all, func(r rune) bool { return r == ',' })
 	for _, v := range fieldsFunc {
-		others = append(others, core.Address(strings.TrimSpace(v)))
+		members = append(members, core.Address(strings.TrimSpace(v)))
 	}
+
+	cls := core.Cluster{
+		Me:      core.Address(*me),
+		Members: members,
+	}
+
 	config := mgr.Config{
-		Me:                   core.Address(*me),
-		Others:               others,
 		TickIntervalMilliSec: *tick,
 		ElectionTimeoutMax:   *eleMax,
 		ElectionTimeoutMin:   *eleMin,
@@ -43,7 +47,7 @@ func main() {
 
 	// mgr
 	inputCh := make(chan *mgr.Rpc, 10)
-	raftMgr := mgr.NewRaftMgr(config, &state_machine.LogPrintStateMachine{}, inputCh)
+	raftMgr := mgr.NewRaftMgr(cls, config, &state_machine.LogPrintStateMachine{}, inputCh)
 	go raftMgr.Run()
 
 	// caller
@@ -52,7 +56,7 @@ func main() {
 	go caller.Run()
 
 	// server
-	lis, err := net.Listen("tcp", string(config.Me))
+	lis, err := net.Listen("tcp", string(cls.Me))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

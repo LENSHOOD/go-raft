@@ -55,32 +55,40 @@ func newSvr(svrNo int, svrNum int) *svr {
 	inputCh := make(chan *mgr.Rpc, 10)
 
 	cfg := commCfg
-	cfg.Me = srvAddrs[svrNo]
+	var others []core.Address
+	var members []core.Address
 	for i, v := range srvAddrs {
 		if i == svrNum {
 			break
 		}
+
+		members = append(members, v)
 		if i == svrNo {
 			continue
 		}
-		cfg.Others = append(cfg.Others, v)
+		others = append(others, v)
+	}
+
+	cls := core.Cluster{
+		Me:      srvAddrs[svrNo],
+		Members: members,
 	}
 
 	mockSm := &mockStateMachine{}
 	//fTicker := &fakeTicker{make(chan time.Time)}
 	//manager := mgr.NewRaftMgrWithTicker(cfg, mockSm, inputCh, fTicker)
-	manager := mgr.NewRaftMgr(cfg, mockSm, inputCh)
+	manager := mgr.NewRaftMgr(cls, cfg, mockSm, inputCh)
 
 	reqOutputCh := make(chan *mgr.Rpc, 10)
 	manager.Dispatcher.RegisterReq(reqOutputCh)
 
 	respChs := make(map[core.Address]<-chan *mgr.Rpc)
-	for _, addr := range cfg.Others {
+	for _, addr := range others {
 		ch := manager.Dispatcher.RegisterResp(addr)
 		respChs[addr] = ch
 	}
 
-	return &svr{cfg.Me, manager, inputCh, reqOutputCh, respChs, mockSm}
+	return &svr{cls.Me, manager, inputCh, reqOutputCh, respChs, mockSm}
 }
 
 type router struct {

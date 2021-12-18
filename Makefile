@@ -13,4 +13,4 @@ test:
 	go test ./...
 
 clean:
-	go clean -i -r
+	go clean -i -r -cache -testcache

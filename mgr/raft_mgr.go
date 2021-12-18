@@ -33,8 +33,6 @@ type ConfigChange struct {
 }
 
 type Config struct {
-	Me                   core.Address
-	Others               []core.Address
 	TickIntervalMilliSec int64
 	ElectionTimeoutMin   int64
 	ElectionTimeoutMax   int64
@@ -180,7 +178,7 @@ func (m *RaftManager) Run() {
 	}
 
 	m.ticker.Start()
-	logger.Printf("[MGR-%s] Raft Manager Started.", m.cfg.Me)
+	logger.Printf("[MGR-%s] Raft Manager Started.", m.me())
 
 	for !m.switcher.isOff() {
 		ctx := context.Background()
@@ -198,7 +196,7 @@ func (m *RaftManager) Run() {
 			span, spctx := opentracing.StartSpanFromContext(req.Ctx, "mgr-received-rpc")
 			ctx = spctx
 
-			logger.Printf("[MGR-%s] Received from %s: %s", m.cfg.Me, req.Addr, req.Payload)
+			logger.Printf("[MGR-%s] Received from %s: %s", m.me(), req.Addr, req.Payload)
 
 			if cc, ok := req.Payload.(*ConfigChange); ok {
 				req.Payload = &core.CmdReq{Cmd: m.convertConfigChangeToCmd(cc)}
@@ -213,28 +211,24 @@ func (m *RaftManager) Run() {
 			res = m.obj.TakeAction(core.Msg{
 				Tp:      tp,
 				From:    req.Addr,
-				To:      m.cfg.Me,
+				To:      m.me(),
 				Payload: req.Payload,
 			})
 			span.Finish()
 		}
 
 		if res != core.NullMsg {
-			// update whole cluster to catch up with raft object config change
-			// TODO: only a temporary solution, try more elegant approach
-			m.updateCluster(m.obj.GetCluster())
-
 			span, spctx := opentracing.StartSpanFromContext(ctx, "mgr-process-raft-result")
 			switch res.Tp {
 			case core.MoveState:
 				span.LogFields(opLog.Object("move-state", res.Payload))
 				m.obj = res.Payload.(core.RaftObject)
-				logger.Printf("[MGR-%s] Role Changed: %T", m.cfg.Me, res.Payload)
+				logger.Printf("[MGR-%s] Role Changed: %T", m.me(), res.Payload)
 			case core.Rpc:
 				if resp, ok := res.Payload.(*core.CmdResp); ok && !resp.Success {
 					// if no leader elected yet, return self address to let client give another try
 					if leaderId, ok := resp.Result.(core.Address); ok && leaderId == core.InvalidId {
-						resp.Result = m.cfg.Me
+						resp.Result = m.me()
 					}
 				}
 
@@ -258,12 +252,12 @@ func (m *RaftManager) sendTo(ctx context.Context, to core.Address, payload inter
 			m.Dispatcher.Cancel(rpc.Addr)
 		}
 
-		logger.Printf("[MGR-%s] Sent: [%s], msg: %s", m.cfg.Me, rpc.Addr, payload)
+		logger.Printf("[MGR-%s] Sent: [%s], msg: %s", m.me(), rpc.Addr, payload)
 	}
 
 	switch to {
 	case core.All:
-		for _, addr := range m.cfg.Others {
+		for _, addr := range m.others() {
 			dispatch(&Rpc{ctx, addr, payload})
 		}
 	case core.Composed:
@@ -280,15 +274,25 @@ func (m *RaftManager) Stop() {
 	m.Dispatcher.clearAll()
 }
 
-func (m *RaftManager) updateCluster(cls core.Cluster) {
-	var others []core.Address
-	for _, addr := range cls.Members {
-		if addr != m.cfg.Me {
-			others = append(others, addr)
-		}
+func (m *RaftManager) me() core.Address {
+	return m.obj.GetCluster().Me
+}
+
+func (m *RaftManager) others() []core.Address {
+	all := m.obj.GetCluster().Members
+	if len(all) == 0 {
+		return make([]core.Address, 0)
 	}
 
-	m.cfg.Others = others
+	others := make([]core.Address, 0, len(all)-1)
+	for _, addr := range all {
+		if addr == m.me() {
+			continue
+		}
+		others = append(others, addr)
+	}
+
+	return others
 }
 
 func (m *RaftManager) convertConfigChangeToCmd(cc *ConfigChange) core.Command {
@@ -341,28 +345,19 @@ func (m *RaftManager) GetAllEntries() []core.Entry {
 	return m.obj.GetAllEntries()
 }
 
-func (m *RaftManager) GetConfig() Config {
+func (m *RaftManager) GetOthers() []core.Address {
 	m.assertDebugMode()
-	return m.cfg
+	return m.others()
 }
 
-func NewRaftMgr(cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManager {
-	return NewRaftMgrWithTicker(cfg, sm, inputCh, NewDefaultTicker(time.Millisecond*time.Duration(cfg.TickIntervalMilliSec)))
+func NewRaftMgr(cls core.Cluster, cfg Config, sm core.StateMachine, inputCh chan *Rpc) *RaftManager {
+	return NewRaftMgrWithTicker(cls, cfg, sm, inputCh, NewDefaultTicker(time.Millisecond*time.Duration(cfg.TickIntervalMilliSec)))
 }
 
-func NewRaftMgrWithTicker(cfg Config, sm core.StateMachine, inputCh chan *Rpc, ticker Ticker) *RaftManager {
+func NewRaftMgrWithTicker(cls core.Cluster, cfg Config, sm core.StateMachine, inputCh chan *Rpc, ticker Ticker) *RaftManager {
 	mgr := RaftManager{
 		input: inputCh,
 		cfg:   cfg,
-	}
-
-	// build cluster with id
-	cls := core.Cluster{
-		Me: cfg.Me,
-	}
-	cls.Members = append(cls.Members, cls.Me)
-	for _, addr := range cfg.Others {
-		cls.Members = append(cls.Members, addr)
 	}
 
 	if ticker == nil {

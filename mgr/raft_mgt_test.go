@@ -25,9 +25,12 @@ func (m *mockStateMachine) Exec(cmd core.Command) interface{} {
 
 var mockSm = &mockStateMachine{}
 
+var cls = core.Cluster{
+	Me:      "192.168.1.1:32104",
+	Members: []core.Address{"192.168.1.1:32104", "192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
+}
+
 var cfg = Config{
-	Me:                   "192.168.1.1:32104",
-	Others:               []core.Address{"192.168.1.2:32104", "192.168.1.3:32104", "192.168.1.4:32104", "192.168.1.5:32104"},
 	TickIntervalMilliSec: 30,
 	ElectionTimeoutMin:   10,
 	ElectionTimeoutMax:   50,
@@ -60,9 +63,10 @@ var standardCluster = core.Cluster{Me: "192.168.1.1:32104",
 func (t *T) TestTick(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr := NewRaftMgr(cls, cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.NullMsg)
+	mockObj.On("GetCluster", mock.Anything).Return(standardCluster)
 	mgr.obj = mockObj
 
 	// when
@@ -77,7 +81,7 @@ func (t *T) TestTick(c *C) {
 func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr := NewRaftMgr(cls, cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
 		Tp:      core.MoveState,
@@ -103,7 +107,7 @@ func (t *T) TestRaftMgrShouldChangeRaftObjWhenReceiveMoveStateMsg(c *C) {
 func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr := NewRaftMgr(cls, cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
 		Tp:      core.Rpc,
@@ -132,7 +136,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToRelateAddressWhenReceiveRpcMsg(c *C) {
 func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastMsg(c *C) {
 	// given
 	inputCh, outputCh := make(chan *Rpc, 10), make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr := NewRaftMgr(cls, cfg, mockSm, inputCh)
 	mgr.Dispatcher.RegisterReq(outputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.Msg{
@@ -154,7 +158,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 
 	// then
 	mockObj.AssertExpectations(c)
-	c.Assert(len(outputCh), Equals, len(mgr.cfg.Others))
+	c.Assert(len(outputCh), Equals, len(mgr.others()))
 	for i := 0; i < len(outputCh); i++ {
 		res := <-outputCh
 		c.Assert(res.Payload.(*core.AppendEntriesReq).Term, Equals, core.Term(10))
@@ -164,7 +168,7 @@ func (t *T) TestRaftMgrShouldRedirectMsgToAllOtherServerWhenReceiveRpcBroadcastM
 func (t *T) TestRaftMgrShouldSetMsgTypeAsCmdWhenReceiveCmdMsg(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr := NewRaftMgr(cls, cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.On("TakeAction", mock.Anything).Return(core.NullMsg).Run(func(args mock.Arguments) {
 		msg := args[0].(core.Msg)
@@ -272,7 +276,7 @@ func (t *T) TestDispatcherShouldRemoveAllChannelWhenCallClearAll(c *C) {
 func (t *T) TestRaftMgrShouldReturnSelfAddressWhenReceiveFalseCmdRespWithInvalidLeaderId(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr := NewRaftMgr(cls, cfg, mockSm, inputCh)
 
 	mockObj := new(fakeRaftObject)
 	mockObj.
@@ -313,14 +317,14 @@ func (t *T) TestRaftMgrShouldReturnSelfAddressWhenReceiveFalseCmdRespWithInvalid
 		c.Fail()
 	} else {
 		c.Assert(cmdResp.Success, Equals, false)
-		c.Assert(cmdResp.Result, Equals, mgr.cfg.Me)
+		c.Assert(cmdResp.Result, Equals, mgr.me())
 	}
 }
 
 func (t *T) TestConfigChangeAddServerWillBeConvertToConfigChangeCmd(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr := NewRaftMgr(cls, cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.
 		On("GetCluster", mock.Anything).
@@ -345,7 +349,7 @@ func (t *T) TestConfigChangeAddServerWillBeConvertToConfigChangeCmd(c *C) {
 func (t *T) TestConfigChangeRemoveServerWillBeConvertToConfigChangeCmd(c *C) {
 	// given
 	inputCh := make(chan *Rpc, 10)
-	mgr := NewRaftMgr(cfg, mockSm, inputCh)
+	mgr := NewRaftMgr(cls, cfg, mockSm, inputCh)
 	mockObj := new(fakeRaftObject)
 	mockObj.
 		On("GetCluster", mock.Anything).

@@ -37,10 +37,10 @@ func (t *T) TestAddServerThenRemoveServer(c *C) {
 	waitNumOfSvrLogLength(c, svrsOf4, 3, 4)
 	time.Sleep(time.Second)
 
-	c.Assert(svr0.mgr.GetConfig().Others, DeepEquals, []core.Address{svr1.addr, svr2.addr, svr3.addr})
-	c.Assert(svr1.mgr.GetConfig().Others, DeepEquals, []core.Address{svr0.addr, svr2.addr, svr3.addr})
-	c.Assert(svr2.mgr.GetConfig().Others, DeepEquals, []core.Address{svr0.addr, svr1.addr, svr3.addr})
-	c.Assert(svr3.mgr.GetConfig().Others, DeepEquals, []core.Address{svr0.addr, svr1.addr, svr2.addr})
+	c.Assert(svr0.mgr.GetOthers(), DeepEquals, []core.Address{svr1.addr, svr2.addr, svr3.addr})
+	c.Assert(svr1.mgr.GetOthers(), DeepEquals, []core.Address{svr0.addr, svr2.addr, svr3.addr})
+	c.Assert(svr2.mgr.GetOthers(), DeepEquals, []core.Address{svr0.addr, svr1.addr, svr3.addr})
+	c.Assert(svr3.mgr.GetOthers(), DeepEquals, []core.Address{svr0.addr, svr1.addr, svr2.addr})
 
 	// remove a follower
 	followerToBeRemoved := getFollowers(svrsOf4)[0]
@@ -51,10 +51,10 @@ func (t *T) TestAddServerThenRemoveServer(c *C) {
 
 	for _, svr := range svrsOf4 {
 		if svr != followerToBeRemoved {
-			c.Assert(len(svr.mgr.GetConfig().Others), Equals, 2)
+			c.Assert(len(svr.mgr.GetOthers()), Equals, 2)
 		} else {
 			// removed server will never receive any logs
-			c.Assert(len(svr.mgr.GetConfig().Others), Equals, 3)
+			c.Assert(len(svr.mgr.GetOthers()), Equals, 3)
 		}
 	}
 
@@ -113,7 +113,7 @@ func (t *T) TestTransferLeadership(c *C) {
 		newLeader = waitLeader(c, expectCurrLeader)
 	}
 
-	c.Assert(len(newLeader.mgr.GetConfig().Others), Equals, 3)
+	c.Assert(len(newLeader.mgr.GetOthers()), Equals, 3)
 
 	close(r.done)
 	svr0.mgr.Stop()
