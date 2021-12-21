@@ -22,7 +22,7 @@ Raft is a consensus algorithm that is designed to be easy to understand. It's eq
 ![](./arch.jpg)
 
 ### Unfinished Features
-- [ ] Config Change (only single node will be added or removed, for simplicity considering)
+- [x] Config Change (only single node will be added or removed, for simplicity considering)
 - [ ] Log Compaction
 - [ ] Log Persistence
 - [ ] Long-lived connection of gprc server 
