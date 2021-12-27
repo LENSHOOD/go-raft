@@ -1,5 +1,7 @@
 ## Implementation of Raft by Golang
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/LENSHOOD/go-raft)](https://goreportcard.com/report/github.com/LENSHOOD/go-raft) [![GitHub license](https://img.shields.io/github/license/LENSHOOD/go-raft)](https://github.com/LENSHOOD/go-raft/blob/master/LICENSE)
+
 This project is an implementation of Raft algorithm by golang.
 
 What is Raft ?
