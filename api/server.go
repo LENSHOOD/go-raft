@@ -94,7 +94,6 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 	conn, err := grpc.Dial(
 		string(rpc.Addr),
 		grpc.WithInsecure(),
-		grpc.WithBlock(),
 		grpc.WithUnaryInterceptor(otgrpc.OpenTracingClientInterceptor(opentracing.GlobalTracer(), otgrpc.LogPayloads())),
 		grpc.WithStreamInterceptor(otgrpc.OpenTracingStreamClientInterceptor(opentracing.GlobalTracer(), otgrpc.LogPayloads())))
 	if err != nil {

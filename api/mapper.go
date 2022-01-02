@@ -182,8 +182,17 @@ func MapToCmdResponse(from *core.CmdResp) (to *CmdResponse) {
 		return nil
 	}
 
+	var result = ""
+	if from.Result != nil {
+		switch from.Result.(type) {
+		case string:
+			result = from.Result.(string)
+		case core.Address:
+			result = string(from.Result.(core.Address))
+		}
+	}
 	return &CmdResponse{
-		Result:  from.Result.(string),
+		Result:  result,
 		Success: from.Success,
 	}
 }

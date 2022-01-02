@@ -11,8 +11,9 @@ import (
 
 func runClient(*cobra.Command, []string) {
 	callAddr := clientFlags.leader
-	resp := &api.CmdResponse{Result: "nil-resp"}
-	for resp = sendCmd(callAddr, clientFlags.cmd); !resp.Success; {
+
+	resp := sendCmd(callAddr, clientFlags.cmd)
+	for ; !resp.Success; resp = sendCmd(callAddr, clientFlags.cmd) {
 		callAddr = resp.Result
 	}
 

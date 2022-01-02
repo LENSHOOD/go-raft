@@ -12,12 +12,13 @@ import (
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"strings"
 )
 
 func runServer(*cobra.Command, []string) {
 	var members []core.Address
 	for _, v := range serverFlags.members {
-		members = append(members, core.Address(v))
+		members = append(members, core.Address(strings.TrimSpace(v)))
 	}
 	cls := core.Cluster{
 		Me:      core.Address(serverFlags.me),
