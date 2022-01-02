@@ -31,3 +31,4 @@ Raft is a consensus algorithm that is designed to be easy to understand. It's eq
 - [x] Redirect to leader when follower received cmd request
 - [ ] Error types arrangement
 - [x] Introduce Cobra to client
+- [ ] Chaos test
