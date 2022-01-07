@@ -2,15 +2,14 @@ package cmd
 
 import (
 	"github.com/LENSHOOD/go-raft/api"
+	. "github.com/LENSHOOD/go-raft/comm"
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/LENSHOOD/go-raft/mgr"
 	"github.com/LENSHOOD/go-raft/state_machine"
-	"github.com/LENSHOOD/go-raft/tracer"
 	otgrpc "github.com/opentracing-contrib/go-grpc"
 	"github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
-	"log"
 	"net"
 	"strings"
 )
@@ -32,7 +31,7 @@ func runServer(*cobra.Command, []string) {
 	}
 
 	// tracer
-	tracerCloser := tracer.InitGlobalTracer("raft-server: " + serverFlags.me)
+	tracerCloser := InitGlobalTracer("raft-server: " + serverFlags.me)
 	defer tracerCloser.Close()
 
 	// mgr
@@ -48,7 +47,7 @@ func runServer(*cobra.Command, []string) {
 	// server
 	lis, err := net.Listen("tcp", string(cls.Me))
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		GetLogger().Fatalf("failed to listen: %v", err)
 	}
 
 	s := grpc.NewServer(
@@ -57,6 +56,6 @@ func runServer(*cobra.Command, []string) {
 	)
 	api.RegisterRaftRpcServer(s, api.NewServer(inputCh, raftMgr))
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		GetLogger().Fatalf("failed to serve: %v", err)
 	}
 }

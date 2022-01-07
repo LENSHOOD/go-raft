@@ -2,17 +2,15 @@ package mgr
 
 import (
 	"context"
+	. "github.com/LENSHOOD/go-raft/comm"
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/opentracing/opentracing-go"
 	opLog "github.com/opentracing/opentracing-go/log"
-	"log"
 	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
 )
-
-var logger = log.Default()
 
 type Rpc struct {
 	Ctx     context.Context
@@ -99,7 +97,7 @@ func (d *dispatcher) Cancel(addr core.Address) {
 func (d *dispatcher) dispatch(rpc *Rpc) {
 	defer func() {
 		if err := recover(); err != nil {
-			logger.Printf("[MGR] failed to dispatch due to panic: %v", err)
+			GetLogger().Errorf("[MGR] failed to dispatch due to panic: %v", err)
 		}
 	}()
 
@@ -108,13 +106,13 @@ func (d *dispatcher) dispatch(rpc *Rpc) {
 		if d.reqOutput != nil {
 			d.reqOutput <- rpc
 		} else {
-			logger.Printf("[MGR] request channel haven't registered yet, dispatch failed...")
+			GetLogger().Errorf("[MGR] request channel haven't registered yet, dispatch failed...")
 		}
 	case *core.AppendEntriesResp, *core.RequestVoteResp, *core.CmdResp:
 		if ch, exist := d.respOutputs.Load(rpc.Addr); exist {
 			ch.(chan *Rpc) <- rpc
 		} else {
-			logger.Printf("[MGR] response channel not found: %s, dispatch failed...", rpc.Addr)
+			GetLogger().Errorf("[MGR] response channel not found: %s, dispatch failed...", rpc.Addr)
 		}
 	}
 }
@@ -178,7 +176,7 @@ func (m *RaftManager) Run() {
 	}
 
 	m.ticker.Start()
-	logger.Printf("[MGR-%s] Raft Manager Started.", m.me())
+	GetLogger().Infof("[MGR-%s] Raft Manager Started.", m.me())
 
 	for !m.switcher.isOff() {
 		ctx := context.Background()
@@ -196,7 +194,7 @@ func (m *RaftManager) Run() {
 			span, spctx := opentracing.StartSpanFromContext(req.Ctx, "mgr-received-rpc")
 			ctx = spctx
 
-			logger.Printf("[MGR-%s] Received from %s: %s", m.me(), req.Addr, req.Payload)
+			GetLogger().Infof("[MGR-%s] Received from %s: %s", m.me(), req.Addr, req.Payload)
 
 			if cc, ok := req.Payload.(*ConfigChange); ok {
 				req.Payload = &core.CmdReq{Cmd: m.convertConfigChangeToCmd(cc)}
@@ -223,7 +221,7 @@ func (m *RaftManager) Run() {
 			case core.MoveState:
 				span.LogFields(opLog.Object("move-state", res.Payload))
 				m.obj = res.Payload.(core.RaftObject)
-				logger.Printf("[MGR-%s] Role Changed: %T", m.me(), res.Payload)
+				GetLogger().Infof("[MGR-%s] Role Changed: %T", m.me(), res.Payload)
 			case core.Rpc:
 				if resp, ok := res.Payload.(*core.CmdResp); ok && !resp.Success {
 					// if no leader elected yet, return self address to let client give another try
@@ -252,7 +250,7 @@ func (m *RaftManager) sendTo(ctx context.Context, to core.Address, payload inter
 			m.Dispatcher.Cancel(rpc.Addr)
 		}
 
-		logger.Printf("[MGR-%s] Sent: [%s], msg: %s", m.me(), rpc.Addr, payload)
+		GetLogger().Infof("[MGR-%s] Sent: [%s], msg: %s", m.me(), rpc.Addr, payload)
 	}
 
 	switch to {
@@ -318,7 +316,7 @@ func (m *RaftManager) convertConfigChangeToCmd(cc *ConfigChange) core.Command {
 
 func (m *RaftManager) assertDebugMode() {
 	if !m.cfg.DebugMode {
-		log.Fatalf("Cannot run debug method if DebugMode is off.")
+		GetLogger().Fatalf("Cannot run debug method if DebugMode is off.")
 	}
 }
 
@@ -361,7 +359,7 @@ func NewRaftMgrWithTicker(cls core.Cluster, cfg Config, sm core.StateMachine, in
 	}
 
 	if ticker == nil {
-		log.Fatalf("Ticker should be provided.")
+		GetLogger().Fatalf("Ticker should be provided.")
 	}
 	mgr.ticker = ticker
 

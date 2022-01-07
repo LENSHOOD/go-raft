@@ -3,9 +3,9 @@ package cmd
 import (
 	"context"
 	"github.com/LENSHOOD/go-raft/api"
+	. "github.com/LENSHOOD/go-raft/comm"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
-	"log"
 	"time"
 )
 
@@ -17,13 +17,13 @@ func runClient(*cobra.Command, []string) {
 		callAddr = resp.Result
 	}
 
-	log.Printf("Cmd executed, success: %t, result: %s", resp.Success, resp.Result)
+	GetLogger().Infof("Cmd executed, success: %t, result: %s", resp.Success, resp.Result)
 }
 
 func sendCmd(leaderAddr string, cmd string) *api.CmdResponse {
 	conn, err := grpc.Dial(leaderAddr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		GetLogger().Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
 
@@ -32,7 +32,7 @@ func sendCmd(leaderAddr string, cmd string) *api.CmdResponse {
 
 	response, err := api.NewRaftRpcClient(conn).ExecCmd(ctx, &api.CmdRequest{Cmd: cmd})
 	if err != nil {
-		log.Fatalf("Error occured: %s", err.Error())
+		GetLogger().Fatalf("Error occured: %s", err.Error())
 	}
 
 	return response

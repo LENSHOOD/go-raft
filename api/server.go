@@ -2,17 +2,15 @@ package api
 
 import (
 	"context"
+	. "github.com/LENSHOOD/go-raft/comm"
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/LENSHOOD/go-raft/mgr"
 	otgrpc "github.com/opentracing-contrib/go-grpc"
 	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
-	"log"
 	"time"
 )
-
-var logger = log.Default()
 
 type RaftServer struct {
 	inputCh chan *mgr.Rpc
@@ -43,7 +41,7 @@ func (s *RaftServer) ExecCmd(ctx context.Context, in *CmdRequest) (*CmdResponse,
 func (s *RaftServer) serve(ctx context.Context, inPayload interface{}) (outPayload interface{}) {
 	p, ok := peer.FromContext(ctx)
 	if !ok {
-		log.Fatalf("no peer")
+		GetLogger().Fatalf("no peer")
 	}
 
 	addr := core.Address(p.Addr.String())
@@ -97,7 +95,7 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 		grpc.WithUnaryInterceptor(otgrpc.OpenTracingClientInterceptor(opentracing.GlobalTracer(), otgrpc.LogPayloads())),
 		grpc.WithStreamInterceptor(otgrpc.OpenTracingStreamClientInterceptor(opentracing.GlobalTracer(), otgrpc.LogPayloads())))
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		GetLogger().Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
 
@@ -109,7 +107,7 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 	case *core.RequestVoteReq:
 		resp, err := NewRaftRpcClient(conn).RequestVote(ctx, MapToRequestVoteArguments(rpc.Payload.(*core.RequestVoteReq)))
 		if err != nil {
-			logger.Printf("[Caller] RequestVote error: %v", err)
+			GetLogger().Errorf("[Caller] RequestVote error: %v", err)
 		} else {
 			resPayload = MapToRequestVoteResp(resp)
 		}
@@ -117,7 +115,7 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 	case *core.AppendEntriesReq:
 		resp, err := NewRaftRpcClient(conn).AppendEntries(ctx, MapToAppendEntriesArguments(rpc.Payload.(*core.AppendEntriesReq)))
 		if err != nil {
-			logger.Printf("[Caller] AppendEntries error: %v", err)
+			GetLogger().Errorf("[Caller] AppendEntries error: %v", err)
 		} else {
 			resPayload = MapToAppendEntriesResp(resp)
 		}
