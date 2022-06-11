@@ -15,11 +15,13 @@ func Execute() {
 	}
 }
 
+var Version = "none"
+
 var root = &cobra.Command{
 	Use:     "go-raft",
 	Short:   "go-raft [OPTIONS] COMMAND",
 	Long:    "go-raft is an implementation of Raft algorithm by golang",
-	Version: "v0.1.0",
+	Version: Version,
 }
 
 var server = &cobra.Command{
