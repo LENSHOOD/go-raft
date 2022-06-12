@@ -14,7 +14,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
     - name: Set up Go
       uses: actions/setup-go@v2
@@ -24,8 +26,8 @@ jobs:
     - name: Build
       run: make build
 
-    - name: Test
-      run: make test
+#    - name: Test
+#      run: make test
       
     - name: Build image
       run: make build-image
