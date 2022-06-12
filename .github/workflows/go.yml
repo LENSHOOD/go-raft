@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ master ]
 
+env:
+  REPO: ghcr.io
+  
 jobs:
 
   build:
@@ -19,7 +22,17 @@ jobs:
         go-version: 1.17
 
     - name: Build
-      run: go build -v ./...
+      run: make build
 
     - name: Test
-      run: go test -v ./...
+      run: make test
+      
+    - name: Build image
+      run: make build-image
+        
+    - name: Log in to registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+      
+    - name: Push image
+      run: make push-image
+
