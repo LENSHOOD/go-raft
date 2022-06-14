@@ -45,7 +45,12 @@ func runServer(*cobra.Command, []string) {
 	go caller.Run()
 
 	// server
-	lis, err := net.Listen("tcp", string(cls.Me))
+	addrs := strings.Split(string(cls.Me), ":")
+	if len(addrs) != 2 {
+		GetLogger().Fatalf("invalid tcp address: %s, should be [host/ip]:port format", cls.Me)
+	}
+
+	lis, err := net.Listen("tcp", ":"+addrs[1])
 	if err != nil {
 		GetLogger().Fatalf("failed to listen: %v", err)
 	}

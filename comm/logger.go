@@ -74,7 +74,7 @@ func initLogger(opts ...ApplyLoggerOption) {
 	writeSyncer := getLogWriter(defaultOpt.loggerFile)
 	encoder := getEncoder()
 	core := zapcore.NewCore(encoder, writeSyncer, defaultOpt.level)
-	zapLogger := zap.New(core)
+	zapLogger := zap.New(core, zap.WithCaller(true))
 	sugarLogger = zapLogger.Sugar()
 }
 
