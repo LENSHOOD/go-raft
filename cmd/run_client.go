@@ -14,10 +14,11 @@ func runClient(*cobra.Command, []string) {
 
 	resp := sendCmd(callAddr, clientFlags.cmd)
 	for ; !resp.Success; resp = sendCmd(callAddr, clientFlags.cmd) {
+		GetLogger().Infof("Redirect to: %s", resp.Result)
 		callAddr = resp.Result
 	}
 
-	GetLogger().Infof("Cmd executed, success: %t, result: %s", resp.Success, resp.Result)
+	GetLogger().Infof("Cmd executed on %s, success: %t, result: %s", callAddr, resp.Success, resp.Result)
 }
 
 func sendCmd(leaderAddr string, cmd string) *api.CmdResponse {
