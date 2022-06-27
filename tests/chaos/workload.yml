@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: raft-client-workload-deploy
+  labels:
+    app: raft-client-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: raft-client-workload
+  template:
+    metadata:
+      labels:
+        app: raft-client-workload
+    spec:
+      containers:
+        - name: go-raft
+          image: ghcr.io/lenshood/go-raft:v0.1.0
+          env:
+            - name: LEADER_ADDR
+              value: go-raft-0.go-raft:34220
+            - name: INTERVAL
+              value: "1"
+          command:
+            - bash
+            - "-c"
+            - |
+              LEADER=${LEADER_ADDR:-127.0.0.1:34220}
+              INC=0
+              SLEEP=${INTERVAL:-1}
+  
+              for ((;;))
+              do
+                ./go-raft client --leader=$LEADER --cmd=$INC
+                INC=$((INC+1))
+                sleep $SLEEP
+              done
