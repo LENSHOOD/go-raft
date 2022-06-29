@@ -36,7 +36,8 @@ func runServer(*cobra.Command, []string) {
 
 	// mgr
 	inputCh := make(chan *mgr.Rpc, 10)
-	raftMgr := mgr.NewRaftMgr(cls, config, &state_machine.LogPrintStateMachine{}, inputCh)
+	raftMgr := mgr.NewRaftMgr(cls, config, state_machine.NewPromMetricSm("push-gateway-svc.prometheus:9091", "raft-instance"), inputCh)
+	//raftMgr := mgr.NewRaftMgr(cls, config, &state_machine.LogPrintStateMachine{}, inputCh)
 	go raftMgr.Run()
 
 	// caller

@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prometheus
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: prometheus-conf
+  namespace: prometheus
+data:
+  prometheus-conf.yml: |
+    global:
+      scrape_interval:     5s
+      evaluation_interval: 15s
+
+    rule_files:
+
+    scrape_configs:
+      - job_name: push-gateway
+        static_configs:
+          - targets: ['push-gateway-svc:9091']
+        honor_labels: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-server-deploy
+  namespace: prometheus
+  labels:
+    app: prometheus-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-server
+  template:
+    metadata:
+      labels:
+        app: prometheus-server
+    spec:
+      containers:
+        - name: prometheus-server
+          image: prom/prometheus
+          ports:
+            - containerPort: 9090
+          args:
+            - "--config.file=/etc/prometheus/prometheus-conf.yml"
+            - "--storage.tsdb.path=/prometheus/"
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/prometheus
+            - name: storage
+              mountPath: /prometheus
+      volumes:
+        - name: conf
+          configMap:
+            name: prometheus-conf
+        - name: storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-server-svc
+  namespace: prometheus
+spec:
+  selector:
+    app: prometheus-server
+  ports:
+    - protocol: TCP
+      port: 9090
+      targetPort: 9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: push-gateway-deploy
+  namespace: prometheus
+  labels:
+    app: push-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: push-gateway
+  template:
+    metadata:
+      labels:
+        app: push-gateway
+    spec:
+      containers:
+        - name: push-gateway
+          image: prom/pushgateway:v1.4.3
+          ports:
+            - containerPort: 9091
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: push-gateway-svc
+  namespace: prometheus
+spec:
+  selector:
+    app: push-gateway
+  ports:
+    - protocol: TCP
+      port: 9091
+      targetPort: 9091
