@@ -13,6 +13,14 @@ LDFLAGS += -X "github.com/LENSHOOD/go-raft/cmd.Version=[$(VERSION) - $(HEAD_COMM
 build:
 	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)'
 
+PROM_INFO = -X "github.com/LENSHOOD/go-raft/state_machine.url=$(PROM_PUSH_GATEWAY_URL)"
+build-chaos:
+ifeq ($(PROM_PUSH_GATEWAY_URL),)
+	$(error Please set env PROM_PUSH_GATEWAY_URL as your prometheus push gateway ip:port)
+else
+	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags=chaos -trimpath -ldflags '$(LDFLAGS) $(PROM_INFO)'
+endif
+
 IMAGE_NAME_VERSION = lenshood/go-raft:$(VERSION)
 build-image:
 	docker build . -t $(IMAGE_NAME_VERSION)
@@ -31,6 +39,9 @@ endif
 
 test:
 	go test ./...
+
+test-chaos:
+	go test ./... -tags=chaos -ldflags '$(PROM_INFO)'
 
 clean:
 	go clean -i -r -cache -testcache

@@ -1,3 +1,6 @@
+//go:build chaos
+// +build chaos
+
 package state_machine
 
 import (
@@ -13,15 +16,9 @@ type T struct{}
 
 var _ = Suite(&T{})
 
-// TODO: use compile flag to choose push gateway state machine and set url from makefile
-var (
-	url = "127.0.0.1:59232"
-	job = "raft-instance"
-)
-
 func (t *T) TestShouldPush(c *C) {
 	// given
-	sm := NewPromMetricSm(url, job)
+	sm := newPromMetricSm(url, job)
 	gaugeStr := "42"
 
 	// when
@@ -53,7 +50,7 @@ func (t *T) TestShouldPush(c *C) {
 
 func (t *T) TestNoneIntegerCmd(c *C) {
 	// given
-	sm := NewPromMetricSm(url, job)
+	sm := newPromMetricSm(url, job)
 
 	// when
 	res := sm.Exec("wrong-cmd")

@@ -1,3 +1,6 @@
+//go:build chaos
+// +build chaos
+
 package state_machine
 
 import (
@@ -18,7 +21,7 @@ type PromMetricStateMachine struct {
 	pusher *push.Pusher
 }
 
-func NewPromMetricSm(pushGatewayUrl string, jobName string) *PromMetricStateMachine {
+func newPromMetricSm(pushGatewayUrl string, jobName string) *PromMetricStateMachine {
 	pusher := push.New(pushGatewayUrl, jobName).Collector(appliedCmd)
 	return &PromMetricStateMachine{
 		pusher,
@@ -37,4 +40,13 @@ func (p *PromMetricStateMachine) Exec(cmd core.Command) interface{} {
 
 	_ = p.pusher.Add()
 	return "Cmd " + cmdStr + " Applied."
+}
+
+var (
+	url = "push-gateway-svc.prometheus:9091"
+	job = "raft-instance"
+)
+
+func BuildStateMachine() core.StateMachine {
+	return newPromMetricSm(url, job)
 }

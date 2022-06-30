@@ -1,3 +1,6 @@
+//go:build !chaos
+// +build !chaos
+
 package state_machine
 
 import (
@@ -15,4 +18,8 @@ func (l *LogPrintStateMachine) Exec(cmd core.Command) interface{} {
 	} else {
 		return "Received: " + string(marshal)
 	}
+}
+
+func BuildStateMachine() core.StateMachine {
+	return &LogPrintStateMachine{}
 }
