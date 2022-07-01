@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: go-raft
-          image: ghcr.io/lenshood/go-raft:v0.1.0
+          image: go-raft-image
           ports:
             - containerPort: 34220
               name: peer

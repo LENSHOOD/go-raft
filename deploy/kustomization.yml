@@ -1,0 +1,6 @@
+resources:
+  - deploy.yml
+images:
+  - name: go-raft-image
+    newName: ghcr.io/lenshood/go-raft
+    newTag: v0.1.0
