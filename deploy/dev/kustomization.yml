@@ -1,5 +1,5 @@
 resources:
-  - deploy.yml
+  - ../base
 images:
   - name: go-raft-image
     newName: ghcr.io/lenshood/go-raft

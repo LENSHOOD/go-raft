@@ -1,6 +1,8 @@
 resources:
-  - ../../deploy
+  - ../../deploy/base
+  - deploy.yml
+namespace: go-raft-chaos-test
 images:
   - name: go-raft-image
-    newName: ghcr.io/lenshood/go-raft
+    newName: lenshood/go-raft
     newTag: v0.1.0-test-chaos
