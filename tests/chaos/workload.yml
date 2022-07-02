@@ -4,6 +4,7 @@ metadata:
   name: raft-client-workload-deploy
   labels:
     app: raft-client-workload
+  namespace: go-raft-chaos-test
 spec:
   replicas: 1
   selector:

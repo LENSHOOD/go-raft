@@ -107,7 +107,7 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 	case *core.RequestVoteReq:
 		resp, err := NewRaftRpcClient(conn).RequestVote(ctx, MapToRequestVoteArguments(rpc.Payload.(*core.RequestVoteReq)))
 		if err != nil {
-			GetLogger().Errorf("[Caller] RequestVote error: %v", err)
+			GetLogger().Errorf("[Caller] Send to %v RequestVote error: %v", rpc.Addr, err)
 		} else {
 			resPayload = MapToRequestVoteResp(resp)
 		}
@@ -115,7 +115,7 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 	case *core.AppendEntriesReq:
 		resp, err := NewRaftRpcClient(conn).AppendEntries(ctx, MapToAppendEntriesArguments(rpc.Payload.(*core.AppendEntriesReq)))
 		if err != nil {
-			GetLogger().Errorf("[Caller] AppendEntries error: %v", err)
+			GetLogger().Errorf("[Caller] Send to %v AppendEntries error: %v", rpc.Addr, err)
 		} else {
 			resPayload = MapToAppendEntriesResp(resp)
 		}

@@ -41,6 +41,9 @@ build-chaos:
 ifeq ($(PROM_PUSH_GATEWAY_URL),)
 	$(error Please set env PROM_PUSH_GATEWAY_URL as your prometheus push gateway ip:port)
 else
+	@echo "###"
+	@echo PROM_PUSH_GATEWAY_URL = $(PROM_PUSH_GATEWAY_URL)
+	@echo "###"
 	env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -tags=chaos -trimpath -ldflags '$(LDFLAGS) $(PROM_INFO)'
 endif
 
