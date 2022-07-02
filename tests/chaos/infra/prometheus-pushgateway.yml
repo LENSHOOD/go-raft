@@ -1,13 +1,7 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: prometheus
----
 kind: ConfigMap
 apiVersion: v1
 metadata:
   name: prometheus-conf
-  namespace: prometheus
 data:
   prometheus-conf.yml: |
     global:
@@ -26,7 +20,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: prometheus-server-deploy
-  namespace: prometheus
   labels:
     app: prometheus-server
 spec:
@@ -63,7 +56,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: prometheus-server-svc
-  namespace: prometheus
 spec:
   selector:
     app: prometheus-server
@@ -76,7 +68,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: push-gateway-deploy
-  namespace: prometheus
   labels:
     app: push-gateway
 spec:
@@ -99,7 +90,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: push-gateway-svc
-  namespace: prometheus
 spec:
   selector:
     app: push-gateway
@@ -107,73 +97,3 @@ spec:
     - protocol: TCP
       port: 9091
       targetPort: 9091
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-datasources
-  namespace: prometheus
-data:
-  prometheus.yaml: |-
-    {
-      "apiVersion": 1,
-      "datasources": [
-        {
-          "access":"proxy",
-          "editable": true,
-          "name": "prometheus",
-          "orgId": 1,
-          "type": "prometheus",
-          "url": "http://prometheus-server-svc:9090",
-          "version": 1
-        }
-      ]
-    }
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: grafana-svc
-  namespace: prometheus
-spec:
-  selector:
-    app: grafana
-  ports:
-    - protocol: TCP
-      port: 3000
-      targetPort: 3000
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: grafana-deploy
-  namespace: prometheus
-  labels:
-    app: grafana
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: grafana
-  template:
-    metadata:
-      labels:
-        app: grafana
-    spec:
-      containers:
-        - name: grafana
-          image: grafana/grafana
-          ports:
-            - containerPort: 3000
-          volumeMounts:
-            - mountPath: /var/lib/grafana
-              name: local
-            - mountPath: /etc/grafana/provisioning/datasources
-              name: datasources
-              readOnly: false
-      volumes:
-        - name: local
-          emptyDir: {}
-        - name: datasources
-          configMap:
-            name: grafana-datasources

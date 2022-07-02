@@ -6,3 +6,7 @@ images:
   - name: go-raft-image
     newName: lenshood/go-raft
     newTag: v0.1.0-test-chaos
+configMapGenerator:
+  - name: customer-env
+    literals:
+      - JAEGER_AGENT_HOST=my-jaeger-agent.monitoring

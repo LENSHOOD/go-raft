@@ -42,3 +42,7 @@ spec:
               ordinal=${BASH_REMATCH[1]}
               # run raft server
               ./go-raft server --me="go-raft-$ordinal.go-raft:34220" --members="go-raft-0.go-raft:34220, go-raft-1.go-raft:34220, go-raft-2.go-raft:34220"
+          envFrom:
+            - configMapRef:
+                name: customer-env
+                optional: true
