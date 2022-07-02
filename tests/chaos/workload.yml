@@ -22,7 +22,7 @@ spec:
             - name: LEADER_ADDR
               value: go-raft-0.go-raft:34220
             - name: INTERVAL
-              value: "1"
+              value: "10"
           command:
             - bash
             - "-c"

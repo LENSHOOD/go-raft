@@ -1,17 +1,12 @@
 package api
 
 import (
-	"encoding/json"
+	"fmt"
 	"github.com/LENSHOOD/go-raft/core"
 )
 
 func cmdMapToStr(cmd core.Command) string {
-	marshal, err := json.Marshal(cmd)
-	if err != nil {
-		return err.Error()
-	}
-
-	return string(marshal)
+	return fmt.Sprintf("%s", cmd)
 }
 
 func mapToRaftEntries(from []*Entry) (to []core.Entry) {

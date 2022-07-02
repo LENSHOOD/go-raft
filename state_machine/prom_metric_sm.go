@@ -5,14 +5,18 @@ package state_machine
 
 import (
 	"fmt"
+	"github.com/LENSHOOD/go-raft/comm"
 	"github.com/LENSHOOD/go-raft/core"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
+	"os"
 	"strconv"
 )
 
 var (
-	appliedCmd = prometheus.NewGauge(prometheus.GaugeOpts{
+	instanceLabelKey      = "instance"
+	instanceLabelValue, _ = os.Hostname()
+	appliedCmd            = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "raft_cmd_applied",
 	})
 )
@@ -22,7 +26,7 @@ type PromMetricStateMachine struct {
 }
 
 func newPromMetricSm(pushGatewayUrl string, jobName string) *PromMetricStateMachine {
-	pusher := push.New(pushGatewayUrl, jobName).Collector(appliedCmd)
+	pusher := push.New(pushGatewayUrl, jobName).Grouping(instanceLabelKey, instanceLabelValue).Collector(appliedCmd)
 	return &PromMetricStateMachine{
 		pusher,
 	}
@@ -35,10 +39,13 @@ func (p *PromMetricStateMachine) Exec(cmd core.Command) interface{} {
 		// integer cmd
 		appliedCmd.Set(float64(v))
 	} else {
+		comm.GetLogger().Errorf("[Prom SM] error to push metric: %v", err)
 		return "Cmd Should Be Number Format Error: " + err.Error()
 	}
 
-	_ = p.pusher.Add()
+	if err := p.pusher.Add(); err != nil {
+		comm.GetLogger().Errorf("[Prom SM] error to push metric: %v", err)
+	}
 	return "Cmd " + cmdStr + " Applied."
 }
 
