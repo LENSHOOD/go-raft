@@ -2,6 +2,8 @@ resources:
   - ../../deploy/base
   - deploy.yml
 namespace: go-raft-chaos-test
+commonAnnotations:
+  "chaos-mesh": "enable"
 images:
   - name: go-raft-image
     newName: lenshood/go-raft

@@ -1,0 +1,17 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Schedule
+metadata:
+  name: schedule-pod-kill
+  namespace: go-raft-chaos-test
+spec:
+  schedule: "@every 5m"
+  type: "PodChaos"
+  historyLimit: 5
+  concurrencyPolicy: Forbid
+  podChaos:
+    action: "pod-kill"
+    mode: fixed
+    value: "1"
+    selector:
+      annotationSelectors:
+        "chaos-mesh": "enable"
