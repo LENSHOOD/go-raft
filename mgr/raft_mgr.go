@@ -216,7 +216,10 @@ func (m *RaftManager) Run() {
 		}
 
 		if res != core.NullMsg {
-			span, spctx := opentracing.StartSpanFromContext(ctx, "mgr-process-raft-result")
+			// once go into this branch, there will be a whole new round of req-resp loop started,
+			// ctx should be replaced to a new one in case of the previous ctx be canceled
+			newCtx := opentracing.ContextWithSpan(context.Background(), opentracing.SpanFromContext(ctx))
+			span, spctx := opentracing.StartSpanFromContext(newCtx, "mgr-process-raft-result")
 			switch res.Tp {
 			case core.MoveState:
 				span.LogFields(opLog.Object("move-state", res.Payload))

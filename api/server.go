@@ -99,7 +99,7 @@ func (c *Caller) sendReq(rpc *mgr.Rpc) {
 	}
 	defer conn.Close()
 
-	ctx, canceled := context.WithDeadline(rpc.Ctx, time.Now().Add(1000*time.Millisecond))
+	ctx, canceled := context.WithDeadline(rpc.Ctx, time.Now().Add(50*time.Millisecond))
 	defer canceled()
 
 	var resPayload interface{}
