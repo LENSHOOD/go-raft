@@ -1,5 +1,5 @@
 resources:
-  - ../../deploy/base
+  - ../../manifests/base
   - deploy.yml
 namespace: go-raft-chaos-test
 commonAnnotations:
