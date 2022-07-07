@@ -1,7 +1,7 @@
 apiVersion: chaos-mesh.org/v1alpha1
 kind: Schedule
 metadata:
-  name: schedule-pod-kill
+  name: schedule-pod-failure
 spec:
   schedule: "@every 5m"
   type: "PodChaos"
