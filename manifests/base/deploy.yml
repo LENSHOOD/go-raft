@@ -29,9 +29,13 @@ spec:
       containers:
         - name: go-raft
           image: go-raft-image
+          imagePullPolicy: Always
           ports:
             - containerPort: 34220
               name: peer
+          readinessProbe:
+            grpc:
+              port: 34220
           command:
             - bash
             - "-c"
@@ -51,3 +55,18 @@ spec:
             - configMapRef:
                 name: customer-env
                 optional: true
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "64Mi"
+              ephemeral-storage: "128"
+            limits:
+              cpu: "100m"
+              memory: "32Mi"
+              ephemeral-storage: "64Mi"
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsUser: 12345
+            runAsGroup: 23456
+
+
