@@ -8,7 +8,7 @@ on:
 
 env:
   REPO: ghcr.io
-  
+
 jobs:
 
   build:
@@ -28,13 +28,23 @@ jobs:
 
 #    - name: Test
 #      run: make test
-      
+
+    - name: prepare for deploy check
+      uses: yokawasa/action-setup-kube-tools@v0.7.1
+      with:
+        kustomize: '4.5.5'
+        kube-score: '1.14.0'
+
+    - name: deploy check
+      run: kustomize build manifests/dev | kube-score score - --exit-one-on-warning --ignore-test statefulset-has-poddisruptionbudget --ignore-test pod-networkpolicy --ignore-test statefulset-has-host-podantiaffinity
+
+
     - name: Build image
       run: make build-image
-        
+
     - name: Log in to registry
       run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
-      
+
     - name: Push image
       run: make push-image
 
